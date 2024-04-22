@@ -184,6 +184,8 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
     private Inventory openInventory;
     // Used internally to allow the closing of inventory within the inventory listener
     private boolean skipClosePacket;
+    // Used internally to allow changing the currently opened inventory properly
+    private boolean openingOtherInventory;
 
     private byte heldSlot;
 
@@ -1729,11 +1731,12 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
         return openInventory;
     }
 
-    private void tryCloseInventory(boolean skipClosePacket) {
+    private void tryCloseInventory(boolean skipClosePacket, boolean openingOtherInventory) {
         var closedInventory = getOpenInventory();
         if (closedInventory == null) return;
 
         this.skipClosePacket = skipClosePacket;
+        this.openingOtherInventory = openingOtherInventory;
 
         if (closedInventory.removeViewer(this)) {
             if (closedInventory == getOpenInventory()) {
@@ -1752,7 +1755,7 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
         InventoryOpenEvent inventoryOpenEvent = new InventoryOpenEvent(inventory, this);
 
         EventDispatcher.callCancellable(inventoryOpenEvent, () -> {
-            tryCloseInventory(true);
+            tryCloseInventory(false, true);
 
             Inventory newInventory = inventoryOpenEvent.getInventory();
             if (newInventory.addViewer(this)) {
@@ -1772,7 +1775,7 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
 
     @ApiStatus.Internal
     public void closeInventory(boolean fromClient) {
-        tryCloseInventory(fromClient);
+        tryCloseInventory(fromClient, false);
         inventory.update();
     }
 
@@ -1794,6 +1797,30 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
     @ApiStatus.Internal
     public void UNSAFE_changeSkipClosePacket(boolean skipClosePacket) {
         this.skipClosePacket = skipClosePacket;
+    }
+
+    /**
+     * Used internally to allow changing an opened inventory without sending
+     * close packets (thus resetting the cursor position) and without resetting
+     * the cursor content.
+     *
+     * @return true if another inventory was opened (is opening), false otherwise
+     */
+    @ApiStatus.Internal
+    public boolean openingOtherInventory() {
+        return openingOtherInventory;
+    }
+
+    /**
+     * Used internally to reset the openingOtherInventory field.
+     * <p>
+     * Shouldn't be used externally without proper understanding of its consequence.
+     *
+     * @param openingOtherInventory the new openingOtherInventory field
+     */
+    @ApiStatus.Internal
+    public void UNSAFE_changeOpeningOtherInventory(boolean openingOtherInventory) {
+        this.openingOtherInventory = openingOtherInventory;
     }
 
     public int getNextTeleportId() {
