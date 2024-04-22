@@ -6,6 +6,7 @@ import net.minestom.server.event.inventory.InventoryButtonClickEvent;
 import net.minestom.server.event.inventory.InventoryCloseEvent;
 import net.minestom.server.inventory.Inventory;
 import net.minestom.server.inventory.click.Click;
+import net.minestom.server.item.ItemStack;
 import net.minestom.server.network.packet.client.common.ClientPongPacket;
 import net.minestom.server.network.packet.client.play.ClientClickWindowButtonPacket;
 import net.minestom.server.network.packet.client.play.ClientClickWindowPacket;
@@ -45,8 +46,22 @@ public class WindowListener {
         player.closeInventory(true);
 
         Inventory newInventory = inventoryCloseEvent.getNewInventory();
-        if (newInventory != null)
+        if (newInventory != null) {
             player.openInventory(newInventory);
+        } else if (openInventory == player.getInventory()) {
+            // player closed his own inventory, #closeInventory doesn't work for that
+            // code taken from InventoryImpl#removeViewer. Not nice regarding maintainability
+            ItemStack cursorItem = player.getInventory().getCursorItem();
+            player.getInventory().setCursorItem(ItemStack.AIR);
+
+            if (!cursorItem.isAir()) {
+                // Drop the item if it can not be added back to the inventory
+                if (!player.getInventory().addItemStack(cursorItem)) {
+                    player.dropItem(cursorItem);
+                }
+            }
+            player.clickPreprocessor().clearCache();
+        }
     }
 
     public static void buttonClickListener(ClientClickWindowButtonPacket packet, Player player) {
