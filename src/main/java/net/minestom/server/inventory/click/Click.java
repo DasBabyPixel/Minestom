@@ -121,6 +121,8 @@ public final class Click {
                     if (button == 1) return new Info.RightDropCursor();
                 } else if (packet.clickType() == ClientClickWindowPacket.ClickType.CLONE) { // Why Mojang, why?
                     if (button == 2) return new Info.MiddleDropCursor();
+                } else if (packet.clickType() == ClientClickWindowPacket.ClickType.QUICK_CRAFT) {
+                    return process(packet.clickType(), -999, button);
                 }
             }
             final boolean valid = slot >= 0 && slot < maxSize;
