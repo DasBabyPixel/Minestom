@@ -6,6 +6,7 @@ import net.minestom.server.coordinate.Point;
 import net.minestom.server.instance.block.BlockFace;
 import net.minestom.server.instance.palette.Palette;
 import org.jetbrains.annotations.ApiStatus;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -15,9 +16,9 @@ import static net.minestom.server.coordinate.CoordConversion.SECTION_BLOCK_COUNT
 import static net.minestom.server.instance.light.LightCompute.*;
 
 final class SkyLight implements Light {
-    private byte[] content;
-    private byte[] contentPropagation;
-    private byte[] contentPropagationSwap;
+    private byte @Nullable [] content;
+    private byte @Nullable [] contentPropagation;
+    private byte @Nullable [] contentPropagationSwap;
 
     private volatile boolean isValidBorders = true;
     private final AtomicBoolean needsSend = new AtomicBoolean(false);
@@ -69,6 +70,26 @@ final class SkyLight implements Light {
     }
 
     @Override
+    public LightCalculation createInternalCalculation(Palette blockPalette, int chunkX, int chunkY, int chunkZ, int[] heightmap, int maxY, LightLookup lightLookup) {
+        return null;
+    }
+
+    @Override
+    public LightCalculation createExternalCalculation(Palette blockPalette, Point[] neighbors, LightLookup lightLookup, PaletteLookup paletteLookup) {
+        return null;
+    }
+
+    @Override
+    public boolean applyInternalCalculation(LightCalculation lightCalculation) {
+        return false;
+    }
+
+    @Override
+    public boolean applyExternalCalculation(LightCalculation lightCalculation) {
+        return false;
+    }
+
+    @Override
     public boolean requiresSend() {
         return needsSend.getAndSet(false);
     }
@@ -90,7 +111,6 @@ final class SkyLight implements Light {
         return Math.max(LightCompute.getLight(contentPropagation, index), LightCompute.getLight(content, index));
     }
 
-    @Override
     public Set<Point> calculateInternal(Palette blockPalette,
                                         int chunkX, int chunkY, int chunkZ,
                                         int[] heightmap, int maxY,
@@ -131,7 +151,6 @@ final class SkyLight implements Light {
         return toUpdate;
     }
 
-    @Override
     public Set<Point> calculateExternal(Palette blockPalette,
                                         Point[] neighbors,
                                         LightLookup lightLookup,
@@ -141,7 +160,8 @@ final class SkyLight implements Light {
         if (!fullyLit) {
             ShortArrayFIFOQueue queue = buildExternalQueue(blockPalette, neighbors, content, lightLookup, paletteLookup);
             contentPropagationTemp = LightCompute.compute(blockPalette, queue);
-            this.contentPropagationSwap = LightCompute.bake(contentPropagationSwap, contentPropagationTemp);
+            var contentPropagationSwap = this.contentPropagationSwap;
+            this.contentPropagationSwap = LightCompute.bake(contentPropagationSwap == null ? EMPTY_CONTENT : contentPropagationSwap, contentPropagationTemp);
         } else {
             this.contentPropagationSwap = null;
         }
@@ -151,7 +171,7 @@ final class SkyLight implements Light {
             final Point neighbor = neighbors[i];
             if (neighbor == null) continue;
             final BlockFace face = FACES[i];
-            if (!LightCompute.compareBorders(content, contentPropagation, contentPropagationTemp, face)) {
+            if (LightCompute.hasGottenBrighter(content, contentPropagation, contentPropagationTemp, face)) {
                 toUpdate.add(neighbor);
             }
         }
