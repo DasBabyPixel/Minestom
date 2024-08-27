@@ -184,7 +184,7 @@ public class DynamicChunk extends Chunk {
     }
 
     @Override
-    public void tick(long time) {
+    public void tick0(long time) {
         if (tickableMap.isEmpty()) return;
         tickableMap.int2ObjectEntrySet().fastForEach(entry -> {
             final int index = entry.getIntKey();
@@ -285,10 +285,6 @@ public class DynamicChunk extends Chunk {
         } finally {
             unlockReadLock();
         }
-    }
-
-    UpdateLightPacket createLightPacket() {
-        return new UpdateLightPacket(chunkX, chunkZ, createLightData(false));
     }
 
     protected LightData createLightData(boolean requiredFullChunk) {
