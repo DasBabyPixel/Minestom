@@ -10,6 +10,7 @@ import net.minestom.server.entity.Player;
 import net.minestom.server.event.player.PlayerMoveEvent;
 import net.minestom.server.instance.Chunk;
 import net.minestom.server.instance.Instance;
+import net.minestom.server.instance.chunksystem.ChunkClaim;
 import net.minestom.server.message.ChatMessageType;
 import net.minestom.server.network.packet.client.common.ClientSettingsPacket;
 import net.minestom.server.network.packet.client.play.ClientPlayerPositionPacket;
@@ -27,6 +28,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.HashSet;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
@@ -128,10 +130,7 @@ public class PlayerMovementIntegrationTest {
         final Instance flatInstance = env.createFlatInstance();
         var connection = env.createConnection();
         Player player = connection.connect(flatInstance, new Pos(0.5, 40, 0.5));
-        // Preload all possible chunks to avoid issues due to async loading
-        Set<CompletableFuture<Chunk>> chunks = new HashSet<>();
-        ChunkRange.chunksInRange(10, 10, viewDistance + 3, (x, z) -> chunks.add(flatInstance.loadChunk(x, z)));
-        CompletableFuture.allOf(chunks.toArray(CompletableFuture[]::new)).join();
+        ChunkRange.chunksInRange(10, 10, viewDistance + 3, flatInstance::loadChunk);
         player.refreshSettings(new ClientSettings(
                 Locale.US, (byte) viewDistance,
                 ChatMessageType.FULL, true,
@@ -149,6 +148,16 @@ public class PlayerMovementIntegrationTest {
         chunkDataPacketCollector.assertCount(ChunkRange.chunksCount(player.effectiveViewDistance()));
     }
 
+    private int countInShape(ChunkClaim.Shape shape, int radius) {
+        int count = 0;
+        for (var x = -radius; x <= radius; x++) {
+            for (var z = -radius; z <= radius; z++) {
+                if (shape.isInRadius(radius, radius, x, z, 0, 0)) count++;
+            }
+        }
+        return count;
+    }
+
     @Test
     public void testSettingsViewDistanceExpansionAndShrink(Env env) {
         var instance = env.createFlatInstance();
@@ -157,10 +166,6 @@ public class PlayerMovementIntegrationTest {
         instance.viewDistance(32);
         var connection = env.createConnection();
         var player = connection.connect(instance, new Pos(0, 42, 0));
-
-        // Preload chunks, otherwise our first assertCount call will fail randomly due to chunks being loaded off the main thread
-        int maxEffective = Math.min(12, instance.viewDistance()) + 1;
-        ChunkRange.chunksInRange(0, 0, maxEffective, (chunkX, chunkZ) -> instance.loadChunk(chunkX, chunkZ).join());
 
         // Expand the client view distance
         int beforeExpand = player.effectiveViewDistance();

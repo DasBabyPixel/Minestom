@@ -7,40 +7,10 @@ import net.minestom.server.instance.Instance;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.concurrent.CompletableFuture;
-import java.util.function.Consumer;
-
 @ApiStatus.Internal
 public final class ChunkUtils {
 
     private ChunkUtils() {
-    }
-
-    /**
-     * Executes {@link Instance#loadOptionalChunk(int, int)} for the array of chunks {@code chunks}
-     * with multiple callbacks, {@code eachCallback} which is executed each time a new chunk is loaded and
-     * {@code endCallback} when all the chunks in the array have been loaded.
-     * <p>
-     * Be aware that {@link Instance#loadOptionalChunk(int, int)} can give a null chunk in the callback
-     * if {@link Instance#hasEnabledAutoChunkLoad()} returns false and the chunk is not already loaded.
-     *
-     * @param instance     the instance to load the chunks from
-     * @param chunks       the chunks to loaded, long value from {@link CoordConversion#chunkIndex(int, int)}
-     * @param eachCallback the optional callback when a chunk get loaded
-     * @return a {@link CompletableFuture} completed once all chunks have been processed,
-     * or completed exceptionally if any chunk fails to load
-     */
-    public static CompletableFuture<Void> optionalLoadAll(Instance instance, long [] chunks,
-                                                                   @Nullable Consumer<Chunk> eachCallback) {
-        CompletableFuture<?>[] futures = new CompletableFuture<?>[chunks.length];
-        for (int i = 0; i < chunks.length; i++) {
-            final long visibleChunk = chunks[i];
-            // WARNING: if autoload is disabled and no chunks are loaded beforehand, player will be stuck.
-            CompletableFuture<Chunk> future = instance.loadOptionalChunk(
-                    CoordConversion.chunkIndexGetX(visibleChunk), CoordConversion.chunkIndexGetZ(visibleChunk));
-            futures[i] = eachCallback != null ? future.thenAccept(eachCallback) : future;
-        }
-        return CompletableFuture.allOf(futures);
     }
 
     public static boolean isLoaded(@Nullable Chunk chunk) {
