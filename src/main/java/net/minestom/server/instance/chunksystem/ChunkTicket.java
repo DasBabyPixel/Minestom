@@ -26,4 +26,9 @@ public record ChunkTicket(int radius, int priority, int tickAdded) implements Co
     public int compareTo(@NotNull ChunkTicket o) {
         return Integer.compare(radius, o.radius);
     }
+
+    public int compareByPriority(@NotNull ChunkTicket o) {
+        // Invert, higher priority first
+        return Integer.compare(o.priority, priority);
+    }
 }
