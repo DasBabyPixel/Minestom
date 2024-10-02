@@ -54,7 +54,7 @@ import static net.minestom.server.utils.chunk.ChunkUtils.*;
 /**
  * InstanceContainer is an instance that contains chunks in contrary to SharedInstance.
  */
-public class InstanceContainer extends Instance {
+public class InstanceContainer extends Instance implements IChunkLoader.Container {
     private static final Logger LOGGER = LoggerFactory.getLogger(InstanceContainer.class);
 
     private static final AnvilLoader DEFAULT_LOADER = new AnvilLoader("world");
@@ -593,6 +593,7 @@ public class InstanceContainer extends Instance {
      *
      * @return the {@link IChunkLoader} of this instance
      */
+    @Override
     public @NotNull IChunkLoader getChunkLoader() {
         return chunkLoader;
     }

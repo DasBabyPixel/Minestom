@@ -19,6 +19,11 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public interface IChunkLoader {
 
+    interface Container {
+        @Nullable
+        IChunkLoader getChunkLoader();
+    }
+
     static @NotNull IChunkLoader noop() {
         return NoopChunkLoaderImpl.INSTANCE;
     }
@@ -114,5 +119,6 @@ public interface IChunkLoader {
      *
      * @param chunk the chunk to unload
      */
-    default void unloadChunk(Chunk chunk) {}
+    default void unloadChunk(Chunk chunk) {
+    }
 }

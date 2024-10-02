@@ -1,60 +1,64 @@
 package net.minestom.server.instance.chunksystem.impl;
 
 import net.minestom.server.instance.Chunk;
-import net.minestom.server.instance.chunksystem.ChunkTicket;
+import net.minestom.server.instance.chunksystem.ChunkClaim;
 
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.VarHandle;
+import java.util.ArrayList;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentSkipListMap;
-import java.util.concurrent.PriorityBlockingQueue;
 
 public final class ChunkEntry {
-    private static final VarHandle COUNT;
-    private final CompletableFuture<Chunk> chunkFuture = new CompletableFuture<>();
-    private final ConcurrentSkipListMap<ChunkTicket, Boolean> tickets = new ConcurrentSkipListMap<>(ChunkTicket::compareByPriority);
-    // Keep track of separate ticket count, tickets#size() is rather expensive iterating through all tickets
-    private volatile int count;
-
-    public ChunkEntry(long chunkIndex) {
-    }
-
+    static final int STATE_UNKNOWN = 0;
+    static final int STATE_GENERATING = 1;
+    static final int STATE_GENERATED = 2;
+    // This will be created by the ChunkSupplier as soon as the ChunkEntry is created
+    // The future completes when the chunk is available, because it has been loaded
+    final CompletableFuture<Chunk> chunkFuture = new CompletableFuture<>();
     /**
-     * @return the amount of tickets that this entry had before adding the new ticket
+     * Sorted claim ArrayList. Manually sorted each time it is modified
      */
-    public int addTicket(ChunkTicket ticket) {
-        if (tickets.put(ticket, Boolean.TRUE) == null) {
-            return require();
-        }
-        throw new IllegalStateException("Tried to add same ticket twice");
-    }
-
+    final ArrayList<ChunkClaim> claims = new ArrayList<>(1);
+    final ArrayList<PropagatedClaim> propagatedClaims = new ArrayList<>(4);
     /**
-     * @return whether the last ticket was removed
+     * The priority propagated from neighbours
      */
-    public boolean removeTicket(ChunkTicket ticket) {
-        if (tickets.remove(ticket, Boolean.TRUE)) {
-            return release();
+    int propagatedPriority;
+    int state = STATE_UNKNOWN;
+    boolean loaded = false;
+
+    int actualPriority() {
+        if (this.claims.isEmpty()) {
+            return this.propagatedPriority;
         }
-        throw new IllegalStateException("Ticket does not exist on this chunk: " + ticket);
+        return Math.max(this.claims.getFirst().priority(), this.propagatedPriority);
     }
 
-    private boolean release() {
-        var n = (int) COUNT.getAndAdd(this, -1) - 1;
-        if (n < 0) throw new Error("Tried to release with count of 0");
-        return n == 0;
+    public CompletableFuture<Chunk> getChunkFuture() {
+        return this.chunkFuture;
     }
 
-    private int require() {
-        return (int) COUNT.getAndAdd(this, 1);
-    }
-
-    static {
-        var lookup = MethodHandles.lookup();
-        try {
-            COUNT = lookup.findVarHandle(ChunkEntry.class, "count", int.class);
-        } catch (NoSuchFieldException | IllegalAccessException e) {
-            throw new Error(e);
+    public void addClaim(ChunkClaim claim) {
+        this.claims.add(claim);
+        if (this.claims.size() != 1) {
+            this.claims.sort(ChunkClaim::compareTo);
         }
+    }
+
+    public void addPropagatedClaim(PropagatedClaim claim) {
+        this.propagatedClaims.add(claim);
+        if (this.propagatedClaims.size() != 1) {
+            this.propagatedClaims.sort(PropagatedClaim::compareTo);
+        }
+    }
+
+    public void removeClaim(ChunkClaim claim) {
+        // Shouldn't be any need to sort on removal
+        if (this.claims.remove(claim)) return;
+        throw new IllegalStateException("Claim does not exist on this chunk: " + claim);
+    }
+
+    public void removePropagatedClaim(PropagatedClaim claim) {
+        // Shouldn't be any need to sort on removal
+        if (this.propagatedClaims.remove(claim)) return;
+        throw new IllegalStateException("Claim does not exist on this chunk: " + claim);
     }
 }
