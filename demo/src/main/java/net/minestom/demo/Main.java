@@ -40,6 +40,7 @@ public class Main {
 
     public static void main(String[] args) {
         System.setProperty("minestom.new-socket-write-lock", "true");
+        System.setProperty("minestom.chunk-view-distance", "32");
         MinecraftServer.setCompressionThreshold(0);
 
         MinecraftServer minecraftServer = MinecraftServer.init(new Auth.Offline());
@@ -173,7 +174,7 @@ public class Main {
         // useful for testing - we don't need to worry about event calls so just set this to a long time
         OpenToLAN.open(new OpenToLANConfig().eventCallDelay(Duration.of(1, TimeUnit.DAY)));
 
-        minecraftServer.start("0.0.0.0", 25565);
+        minecraftServer.start("0.0.0.0", 25566);
 //        minecraftServer.start(java.net.UnixDomainSocketAddress.of("minestom-demo.sock"));
         //Runtime.getRuntime().addShutdownHook(new Thread(MinecraftServer::stopCleanly));
     }

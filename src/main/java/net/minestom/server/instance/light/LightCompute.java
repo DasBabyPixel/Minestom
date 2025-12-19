@@ -11,16 +11,13 @@ import net.minestom.server.utils.Direction;
 import java.util.Arrays;
 import java.util.Objects;
 
-import static net.minestom.server.coordinate.CoordConversion.SECTION_SIZE;
+import static net.minestom.server.coordinate.CoordConversion.SECTION_BLOCK_COUNT;
 
 public final class LightCompute {
     static final Direction[] DIRECTIONS = Direction.values();
     static final BlockFace[] FACES = BlockFace.values();
-    /**
-     * One chunk section is 16x16x16.
-     * One byte stores to light values, each 4 bit
-     */
-    static final int LIGHT_LENGTH = SECTION_SIZE * SECTION_SIZE * SECTION_SIZE / 2;
+    static final int LIGHT_LENGTH = SECTION_BLOCK_COUNT / 2;
+    static final int SECTION_SIZE = 16;
 
     public static final byte[] UNSET_CONTENT = new byte[0];
     public static final byte[] EMPTY_CONTENT = new byte[LIGHT_LENGTH];
@@ -109,7 +106,7 @@ public final class LightCompute {
     /**
      * Computes light in one section
      * <p>
-     * Takes queue of light positions and spreads light from this positions in 3d using Breadth-first search
+     * Takes queue of lights positions and spreads light from this positions in 3d using Breadth-first search
      *
      * @param blockPalette blocks placed in section
      * @param lightPre     shorts queue in format: [4bit light level][4bit y][4bit z][4bit x]
@@ -125,7 +122,7 @@ public final class LightCompute {
         while (!lightPre.isEmpty()) {
             final int index = lightPre.dequeueShort();
 
-            final int newLightLevel = (index >> 12) & 0xF;
+            final int newLightLevel = (index >> 12) & 15;
             final int newIndex = index & 0xFFF;
 
             final int oldLightLevel = getLight(lightArray, newIndex);
@@ -155,7 +152,7 @@ public final class LightCompute {
                 }
 
                 // Section
-                final int newIndex = computeIndex(xO, yO, zO);
+                final int newIndex = xO | (zO << 4) | (yO << 8);
 
                 if (getLight(lightArray, newIndex) < newLightLevel) {
                     final Block currentBlock = Objects.requireNonNullElse(getBlock(blockPalette, x, y, z), Block.AIR);
@@ -183,7 +180,7 @@ public final class LightCompute {
     }
 
     static int getLight(byte[] light, int x, int y, int z) {
-        return getLight(light, computeIndex(x, y, z));
+        return getLight(light, x | (z << 4) | (y << 8));
     }
 
     static int getLight(byte[] light, int index) {
@@ -192,31 +189,19 @@ public final class LightCompute {
         return ((value >>> ((index & 1) << 2)) & 0xF);
     }
 
-    static int computeIndex(int x, int y, int z) {
-        return x | (z << 4) | (y << 8);
-    }
-
     public static Block getBlock(Palette palette, int x, int y, int z) {
         return Block.fromStateId(palette.get(x, y, z));
     }
 
-    /**
-     * Bakes two lighting data sets into one.
-     * <p>
-     * This simply is a {@link Math#max(int, int)} call for the light levels at every position.
-     *
-     * @param content1 the first data set
-     * @param content2 the second data set
-     * @return the baked data set
-     */
     public static byte[] bake(byte[] content1, byte[] content2) {
-        assert content1.length == LIGHT_LENGTH;
-        assert content2.length == LIGHT_LENGTH;
-
+        if (content1 == null && content2 == null) return EMPTY_CONTENT;
         if (content1 == EMPTY_CONTENT && content2 == EMPTY_CONTENT) return EMPTY_CONTENT;
 
         if (content1 == CONTENT_FULLY_LIT) return CONTENT_FULLY_LIT;
         if (content2 == CONTENT_FULLY_LIT) return CONTENT_FULLY_LIT;
+
+        if (content1 == null) return content2;
+        if (content2 == null) return content1;
 
         if (content1 == content2) return content1;
 
@@ -246,20 +231,19 @@ public final class LightCompute {
         return lightMax;
     }
 
-    public static boolean hasGottenBrighter(byte[] content, byte[] contentPropagation, byte[] contentPropagationTemp, BlockFace face) {
-        if (content == null && contentPropagation == null && contentPropagationTemp == null) return false;
+    public static boolean compareBorders(byte[] content, byte[] contentPropagation, byte[] contentPropagationTemp, BlockFace face) {
+        if (content == null && contentPropagation == null && contentPropagationTemp == null) return true;
 
-        // k is the edge of the section, 0 for north, west and bottom(down), 15 for south, east and top(up)
         final int k = switch (face) {
             case WEST, BOTTOM, NORTH -> 0;
             case EAST, TOP, SOUTH -> 15;
         };
-        for (int sectionX = 0; sectionX < SECTION_SIZE; sectionX++) {
-            for (int sectionZ = 0; sectionZ < SECTION_SIZE; sectionZ++) {
+        for (int bx = 0; bx < SECTION_SIZE; bx++) {
+            for (int by = 0; by < SECTION_SIZE; by++) {
                 final int posFrom = switch (face) {
-                    case NORTH, SOUTH -> computeIndex(sectionX, sectionZ, k);
-                    case WEST, EAST -> computeIndex(k, sectionX, sectionZ);
-                    case BOTTOM, TOP -> computeIndex(sectionX, k, sectionZ);
+                    case NORTH, SOUTH -> bx | (k << 4) | (by << 8);
+                    case WEST, EAST -> k | (by << 4) | (bx << 8);
+                    default -> bx | (by << 4) | (k << 8);
                 };
 
                 int valueFrom;
@@ -269,9 +253,9 @@ public final class LightCompute {
                 else valueFrom = Math.max(getLight(content, posFrom), getLight(contentPropagation, posFrom));
 
                 final int valueTo = getLight(contentPropagationTemp, posFrom);
-                if (valueFrom < valueTo) return true;
+                if (valueFrom < valueTo) return false;
             }
         }
-        return false;
+        return true;
     }
 }

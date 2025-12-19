@@ -11,9 +11,7 @@ import net.minestom.server.instance.block.Block;
 import net.minestom.server.instance.block.BlockFace;
 import net.minestom.server.instance.block.BlockHandler;
 import net.minestom.server.instance.heightmap.Heightmap;
-import net.minestom.server.instance.light.AbstractLight;
 import net.minestom.server.instance.light.Light;
-import net.minestom.server.instance.light.LightCalculation;
 import net.minestom.server.instance.palette.Palette;
 import net.minestom.server.network.packet.server.CachedPacket;
 import net.minestom.server.network.packet.server.play.UpdateLightPacket;
@@ -183,19 +181,8 @@ public class LightingChunk extends DynamicChunk {
     @Override
     protected void onLoad() {
         doneInit = true;
-    }
 
-    @Override
-    public void onGenerate() {
-        super.onGenerate();
-
-        for (int section = minSection; section < maxSection; section++) {
-            getSection(section).blockLight().invalidate();
-            getSection(section).skyLight().invalidate();
-        }
-
-        invalidate();
-
+        // Invalidate neighbours since they can see us now
         for (int i = -1; i <= 1; i++) {
             for (int j = -1; j <= 1; j++) {
                 Chunk neighborChunk = instance.getChunk(chunkX + i, chunkZ + j);
@@ -214,6 +201,18 @@ public class LightingChunk extends DynamicChunk {
                 }
             }
         }
+    }
+
+    @Override
+    public void onGenerate() {
+        super.onGenerate();
+
+        for (int section = minSection; section < maxSection; section++) {
+            getSection(section).blockLight().invalidate();
+            getSection(section).skyLight().invalidate();
+        }
+
+        invalidate();
     }
 
     // Lazy compute occlusion map
@@ -358,8 +357,6 @@ public class LightingChunk extends DynamicChunk {
     }
 
     private static Set<Chunk> flushQueue(Instance instance, Set<Point> queue, LightType type, QueueType queueType) {
-        assert Thread.holdsLock(instance);
-
         Set<Point> newQueue = ConcurrentHashMap.newKeySet();
 
         Set<Chunk> responseChunks = ConcurrentHashMap.newKeySet();
@@ -401,21 +398,13 @@ public class LightingChunk extends DynamicChunk {
             CompletableFuture<Void> task = CompletableFuture.runAsync(() -> {
                 try {
                     final Set<Point> toAdd = switch (queueType) {
-                        case INTERNAL -> {
-                            light.createInternalCalculation(blockPalette,
+                        case INTERNAL -> light.calculateInternal(blockPalette,
                                 chunk.getChunkX(), point.blockY(), chunk.getChunkZ(),
                                 lightingChunk.getOcclusionMap(), chunk.instance.getCachedDimensionType().maxY(),
                                 lightLookup);
-                            // TODO
-                            yield Set.of();
-                        }
-                        case EXTERNAL -> {
-                            light.createExternalCalculation(blockPalette,
+                        case EXTERNAL -> light.calculateExternal(blockPalette,
                                 Light.getNeighbors(chunk, point.blockY()),
                                 lightLookup, paletteLookup);
-                            // TODO
-                            yield Set.of();
-                        }
                     };
 
                     light.flip();

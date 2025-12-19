@@ -60,6 +60,7 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class PlayerInit {
 
@@ -394,8 +395,10 @@ public class PlayerInit {
     {
         InstanceManager instanceManager = MinecraftServer.getInstanceManager();
 
+        var lock = new ReentrantLock();
         InstanceContainer instanceContainer = instanceManager.createInstanceContainer();
         instanceContainer.setGenerator(unit -> {
+            lock.lock();
             unit.modifier().fillHeight(0, 40, Block.STONE);
 
             var start = System.nanoTime();
@@ -406,6 +409,7 @@ public class PlayerInit {
             if (unit.absoluteStart().blockY() < 40 && unit.absoluteEnd().blockY() > 40) {
                 unit.modifier().setBlock(unit.absoluteStart().blockX(), 40, unit.absoluteStart().blockZ(), Block.TORCH);
             }
+            lock.unlock();
         });
         instanceContainer.setChunkSupplier(LightingChunk::new);
         instanceContainer.setTimeRate(0);
@@ -414,6 +418,7 @@ public class PlayerInit {
 
         var instance2 = instanceManager.createInstanceContainer();
         instance2.setGenerator(unit -> {
+            lock.lock();
             var start = System.nanoTime();
 
 //             50 ms for every chunk
@@ -421,6 +426,7 @@ public class PlayerInit {
             unit.modifier().fillHeight(0, 34, Block.STONE);
             unit.modifier().fillHeight(34, 39, Block.DIRT);
             unit.modifier().fillHeight(39, 40, Block.GRASS_BLOCK);
+            lock.unlock();
         });
         instance2.setChunkSupplier(LightingChunk::new);
         instance2.setTimeRate(0);

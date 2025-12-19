@@ -62,24 +62,28 @@ class UpdateHandler {
         var x = update.x();
         var z = update.z();
         var chunkIndex = chunkIndex(x, z);
-        var claimData = this.singleThreadedManager.claimMap.get(update.origin());
 
         if (update.updateType().isUnload()) {
+            var claimData = this.singleThreadedManager.claimMap.get(update.origin());
+            assert claimData == null;
             // This chunk has claims, so the update doesn't apply to us.
             // We still have to propagate to chunks further away, though.
+            // TODO would be nice if we can find a nice optimization to reduce
+            //  number of chunks affected by unload propagation. Might be very
+            //  difficult though, to future me: think of all edge cases, there are quite a few
             this.singleThreadedManager.updateQueue.propagateUpdates(update, claimData, disablePropagation);
             return UpdateResult.INVALID_UPDATE;
         }
-
-        assert claimData != null;
 
         var highestEntry = this.singleThreadedManager.tree.findHighestPriorityEntry(entries, this.singleThreadedManager.priorityDrop, x, z);
         var highestPriority = highestEntry.entry().priority();
         if (update.priority() - Vec.EPSILON > highestPriority) {
             // The Priority of the update is higher than the highest priority claim.
-            // This update is stale and can be ignored
+            // This update is stale (from an origin with higher priority) and can be ignored
             return UpdateResult.INVALID_UPDATE;
         }
+        var claimData = this.singleThreadedManager.claimMap.get(update.origin());
+        assert claimData != null;
 
         var currentState = this.chunks.get(chunkIndex);
         return switch (currentState) {

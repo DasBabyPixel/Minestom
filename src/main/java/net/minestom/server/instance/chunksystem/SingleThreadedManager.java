@@ -100,7 +100,7 @@ class SingleThreadedManager {
         return Collections.unmodifiableCollection(this.loadedChunks.values());
     }
 
-    @NotNull Chunk loadedChunk(int x, int z) {
+    @Nullable Chunk loadedChunk(int x, int z) {
         return this.loadedChunks.get(chunkIndex(x, z));
     }
 
@@ -295,6 +295,7 @@ class SingleThreadedManager {
         if (!this.updateHandler.tryChangeToLoaded(chunk)) {
             return;
         }
+        this.chunkAccess.onLoad(chunk);
 
         var chunkIndex = chunkIndex(x, z);
         var claims = this.claimsByChunk.get(chunkIndex);

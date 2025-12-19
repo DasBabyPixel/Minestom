@@ -82,7 +82,6 @@ public class ChunkWorker {
     }
 
     void workerFinishedGeneration(Chunk chunk) {
-        this.chunkAccess.onLoad(chunk);
         this.taskSchedulerThread.addTask(new TaskSchedulerThread.Task.ChunkGenerationFinished(chunk));
         // TODO
     }

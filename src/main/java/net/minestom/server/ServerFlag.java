@@ -80,7 +80,7 @@ public final class ServerFlag {
      * <p>
      *  Defaults to hypotenuse-squared on invalid value
      */
-    public static final String CHUNK_SYSTEM_PRIORITY_DROP = stringProperty("minestom.chunk-system-priority-drop");
+    public static final @Nullable String CHUNK_SYSTEM_PRIORITY_DROP = stringProperty("minestom.chunk-system-priority-drop");
     public static final boolean FASTER_SOCKET_WRITES = booleanProperty("minestom.new-socket-write-lock"); // TODO: promote to default
     public static final boolean ACQUIRABLE_STRICT = booleanProperty("minestom.acquirable-strict", false);
 
