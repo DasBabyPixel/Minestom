@@ -1086,8 +1086,8 @@ public abstract class Instance implements Block.Getter, Block.Setter, Biome.Gett
         int coordY = CoordConversion.globalToSectionRelative(blockY);
         int coordZ = CoordConversion.globalToSectionRelative(blockZ);
 
-        if (light.requiresUpdate())
-            LightingChunk.relightSection(chunk.getInstance(), chunk.chunkX, sectionCoordinate, chunk.chunkZ);
+        if (light.requiresUpdate() && chunk instanceof LightingChunk lighting)
+            lighting.relightSection(sectionCoordinate);
         return light.getLevel(coordX, coordY, coordZ);
     }
 
@@ -1102,8 +1102,8 @@ public abstract class Instance implements Block.Getter, Block.Setter, Biome.Gett
         int coordY = CoordConversion.globalToSectionRelative(blockY);
         int coordZ = CoordConversion.globalToSectionRelative(blockZ);
 
-        if (light.requiresUpdate())
-            LightingChunk.relightSection(chunk.getInstance(), chunk.chunkX, sectionCoordinate, chunk.chunkZ);
+        if (light.requiresUpdate() && chunk instanceof LightingChunk lighting)
+            lighting.relightSection(sectionCoordinate);
         return light.getLevel(coordX, coordY, coordZ);
     }
 }
