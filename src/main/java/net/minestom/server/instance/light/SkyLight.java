@@ -1,7 +1,6 @@
 package net.minestom.server.instance.light;
 
 import it.unimi.dsi.fastutil.shorts.ShortArrayFIFOQueue;
-import net.minestom.server.coordinate.BlockVec;
 import net.minestom.server.coordinate.SectionVec;
 import net.minestom.server.instance.block.BlockFace;
 import net.minestom.server.instance.palette.Palette;
@@ -20,7 +19,7 @@ import static net.minestom.server.instance.light.LightCompute.UNSET_CONTENT;
 import static net.minestom.server.instance.light.LightCompute.buildExternalQueue;
 import static net.minestom.server.instance.light.LightCompute.lazyArray;
 
-final class SkyLight implements Light {
+final class SkyLight implements OldLight {
     private byte @Nullable [] content;
     private byte @Nullable [] contentPropagation;
     private byte @Nullable [] contentPropagationSwap;

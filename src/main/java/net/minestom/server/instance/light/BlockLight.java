@@ -19,7 +19,7 @@ import static net.minestom.server.instance.light.LightCompute.UNSET_CONTENT;
 import static net.minestom.server.instance.light.LightCompute.buildExternalQueue;
 import static net.minestom.server.instance.light.LightCompute.lazyArray;
 
-final class BlockLight implements Light {
+final class BlockLight implements OldLight {
     private byte @Nullable [] content;
     private byte @Nullable [] contentPropagation;
     private byte @Nullable [] contentPropagationSwap;
