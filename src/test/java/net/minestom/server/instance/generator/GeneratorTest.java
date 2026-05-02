@@ -29,6 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@SuppressWarnings("DataFlowIssue")
 public class GeneratorTest {
     @Test
     public void unitSize() {
@@ -135,7 +136,7 @@ public class GeneratorTest {
             var subUnit = subUnits.get(i);
             assertEquals(BlockVec.SECTION, subUnit.size());
             assertEquals(new BlockVec(chunkX * 16, (i + minSection) * 16, chunkZ * 16), subUnit.absoluteStart());
-            assertEquals(subUnit.absoluteStart().add(16), subUnit.absoluteEnd());
+            assertEquals(subUnit.absoluteStart().add(16).asBlockVec(), subUnit.absoluteEnd());
         }
     }
 
