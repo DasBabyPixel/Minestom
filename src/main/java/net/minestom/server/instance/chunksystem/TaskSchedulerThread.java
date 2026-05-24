@@ -16,7 +16,11 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.UnknownNullability;
 import org.jetbrains.annotations.UnmodifiableView;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ThreadLocalRandom;
@@ -327,6 +331,8 @@ class TaskSchedulerThread implements Runnable {
             case Task.AddClaim(var chunkAndClaim) -> this.singleThreadedManager.addClaim(chunkAndClaim);
             case Task.RemoveClaim(var claim, var future) -> this.singleThreadedManager.removeClaim(claim, future);
             case Task.ChunkGenerationFinished(var chunk) -> this.singleThreadedManager.chunkGenerationFinished(chunk);
+            case Task.ChunkGenerationFail(int x, int z, var t) ->
+                    this.singleThreadedManager.chunkGenerationFail(x, z, t);
             case Task.SaveChunk(var chunk, var future) -> this.singleThreadedManager.saveChunk(chunk, future);
             case Task.SaveChunks(var future) -> this.singleThreadedManager.saveChunks(future);
             case Task.SaveInstanceData(var future) -> this.singleThreadedManager.saveInstanceData(future);
@@ -336,7 +342,7 @@ class TaskSchedulerThread implements Runnable {
             case Task.SaveChunkCompleted(var chunk) -> this.singleThreadedManager.saveChunkCompleted(chunk);
             case Task.FinishUnloadAfterPartition(var unloading) ->
                     this.singleThreadedManager.finishUnloadAfterPartition(unloading);
-            case Task.EnqueueUpdate(var update, var claimData, var disablePropagation) ->
+            case Task.EnqueueUpdate(var update, var claimData, boolean disablePropagation) ->
                     this.singleThreadedManager.updateQueue.enqueue(update, claimData, disablePropagation);
             case Task.FinishUnloadAfterSaveAndPartition(var unloading) ->
                     this.singleThreadedManager.finishUnloadChunkAfterSaveAndPartition(unloading);
@@ -382,6 +388,9 @@ class TaskSchedulerThread implements Runnable {
         future1.whenComplete((val, throwable) -> {
             if (throwable != null) future2.completeExceptionally(throwable);
             else future2.complete(function.apply(val));
+        }).exceptionally(t -> {
+            MinecraftServer.getExceptionManager().handleException(t);
+            return null;
         });
     }
 
@@ -510,6 +519,9 @@ class TaskSchedulerThread implements Runnable {
         }
 
         record ChunkGenerationFinished(Chunk chunk) implements Task {
+        }
+
+        record ChunkGenerationFail(int chunkX, int chunkZ, Throwable throwable) implements Task {
         }
 
         record SaveInstanceDataCompleted() implements Task {

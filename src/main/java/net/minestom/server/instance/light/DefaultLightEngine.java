@@ -4,14 +4,18 @@ import net.minestom.server.MinecraftServer;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.Map;
-import java.util.concurrent.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinWorkerThread;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.LockSupport;
 import java.util.function.BooleanSupplier;
 
 @ApiStatus.Internal
 public final class DefaultLightEngine implements LightEngine {
+    @SuppressWarnings("StaticAssignmentOfThrowable")
     private static final Exception PRECONDITION_FAILED = new Exception("Precondition failed");
     private static final int SUBMIT_COUNT = Math.max(Runtime.getRuntime().availableProcessors() + 2, 4);
     private static final DefaultLightEngine INSTANCE = new DefaultLightEngine();
@@ -44,7 +48,7 @@ public final class DefaultLightEngine implements LightEngine {
     }
 
     private void scheduleThenRelease(CompletableFuture<@Nullable Void> future, BooleanSupplier precondition, Runnable work) {
-        workerService.submit(() -> {
+        var _ = workerService.submit(() -> {
             try {
                 if (!precondition.getAsBoolean()) {
                     dec();

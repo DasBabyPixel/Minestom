@@ -4,7 +4,10 @@ import it.unimi.dsi.fastutil.Pair;
 import net.minestom.server.coordinate.Point;
 import net.minestom.server.event.instance.InstanceChunkLoadEvent;
 import net.minestom.server.event.instance.InstanceChunkUnloadEvent;
-import net.minestom.server.instance.*;
+import net.minestom.server.instance.Chunk;
+import net.minestom.server.instance.ChunkLoader;
+import net.minestom.server.instance.DynamicChunk;
+import net.minestom.server.instance.Instance;
 import net.minestom.server.instance.generator.Generator;
 import net.minestom.server.utils.chunk.ChunkSupplier;
 import org.jetbrains.annotations.ApiStatus;
@@ -13,8 +16,6 @@ import org.jetbrains.annotations.UnmodifiableView;
 
 import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
-
-import static net.minestom.server.instance.chunksystem.ChunkClaim.Shape;
 
 /**
  * Manager for a claim-based chunk system.
@@ -94,6 +95,8 @@ public interface ChunkManager {
     void setPriorityDrop(PriorityDrop priorityDrop);
 
     /**
+     * Check whether autosave is enabled.
+     *
      * @return whether autosave is enabled
      * @see #setAutosaveEnabled(boolean)
      */
@@ -116,15 +119,14 @@ public interface ChunkManager {
      * WARNING: the returned chunk can be unloaded (on the chunk's tick thread) as soon as this call returns.
      * The better approach is to use {@link #addClaim(int, int)} to get a chunk.
      *
+     * @param chunkX the chunk X
+     * @param chunkZ the chunk Z
+     * @return the chunk at the specified position, null if not loaded
      * @implNote After the callback {@link ClaimCallbacks#chunkLoaded(ChunkClaim, Chunk)} or
      * {@link ClaimCallbacks#allChunksLoaded(ChunkClaim)} is called, the given chunk
      * could still not be returned by this method. This is because the "loadedChunks" HashMap is updated on the chunk tick thread (partition).
      * This behavior makes {@link InstanceChunkLoadEvent} and {@link InstanceChunkUnloadEvent} more consistent, but creates this inconsistency instead.
      * This could change in the future, when a better alternative presents itself.
-     *
-     * @param chunkX the chunk X
-     * @param chunkZ the chunk Z
-     * @return the chunk at the specified position, null if not loaded
      */
     @Nullable Chunk getLoadedChunk(int chunkX, int chunkZ);
 
@@ -163,6 +165,8 @@ public interface ChunkManager {
     Collection<Chunk> getLoadedChunksManaged();
 
     /**
+     * Adds a chunk claim
+     *
      * @see #addClaim(int, int)
      */
     default ChunkAndClaim addClaim(Point point) {
@@ -170,6 +174,8 @@ public interface ChunkManager {
     }
 
     /**
+     * Adds a chunk claim
+     *
      * @see #addClaim(int, int, int)
      */
     default ChunkAndClaim addClaim(Point point, int radius) {
@@ -177,13 +183,17 @@ public interface ChunkManager {
     }
 
     /**
-     * @see #addClaim(int, int, int, Shape)
+     * Adds a chunk claim
+     *
+     * @see #addClaim(int, int, int, ChunkClaim.Shape)
      */
-    default ChunkAndClaim addClaim(Point point, int radius, Shape shape) {
+    default ChunkAndClaim addClaim(Point point, int radius, ChunkClaim.Shape shape) {
         return addClaim(point.chunkX(), point.chunkZ(), radius, shape);
     }
 
     /**
+     * Adds a chunk claim
+     *
      * @see #addClaim(int, int, int, int)
      */
     default ChunkAndClaim addClaim(Point point, int radius, int priority) {
@@ -191,16 +201,20 @@ public interface ChunkManager {
     }
 
     /**
-     * @see #addClaim(int, int, int, int, Shape)
+     * Adds a chunk claim
+     *
+     * @see #addClaim(int, int, int, int, ChunkClaim.Shape)
      */
-    default ChunkAndClaim addClaim(Point point, int radius, int priority, Shape shape) {
+    default ChunkAndClaim addClaim(Point point, int radius, int priority, ChunkClaim.Shape shape) {
         return addClaim(point.chunkX(), point.chunkZ(), radius, priority, shape);
     }
 
     /**
-     * @see #addClaim(int, int, int, int, Shape, ClaimCallbacks)
+     * Adds a chunk claim
+     *
+     * @see #addClaim(int, int, int, int, ChunkClaim.Shape, ClaimCallbacks)
      */
-    default ChunkAndClaim addClaim(Point point, int radius, int priority, Shape shape, @Nullable ClaimCallbacks callbacks) {
+    default ChunkAndClaim addClaim(Point point, int radius, int priority, ChunkClaim.Shape shape, @Nullable ClaimCallbacks callbacks) {
         return addClaim(point.chunkX(), point.chunkZ(), radius, priority, shape, callbacks);
     }
 
@@ -208,7 +222,7 @@ public interface ChunkManager {
      * Adds a claim to a chunk. The claim will have radius 0 (single-chunk)
      * Adding a claim can take an undefined period of time, chunk generation might have to happen first.
      * Claims added with this method will make the chunk fully generate.
-     * This method uses a default shape of {@link Shape#SQUARE}
+     * This method uses a default shape of {@link ChunkClaim.Shape#SQUARE}
      *
      * @param chunkX the chunk X, in chunk coordinate space
      * @param chunkZ the chunk Z, in chunk coordinate space
@@ -220,7 +234,7 @@ public interface ChunkManager {
      * Adds a claim to a chunk.
      * Adding a claim can take an undefined period of time, chunk generation might have to happen first.
      * Claims added with this method will make the chunk fully generate.
-     * This method uses a default shape of {@link Shape#SQUARE}
+     * This method uses a default shape of {@link ChunkClaim.Shape#SQUARE}
      *
      * @param chunkX the chunk X, in chunk coordinate space
      * @param chunkZ the chunk Z, in chunk coordinate space
@@ -240,13 +254,13 @@ public interface ChunkManager {
      * @param radius the radius of this {@link ChunkClaim}. Use 0 to only load a single chunk.
      * @return the {@link ChunkAndClaim} used to remove the claim.
      */
-    ChunkAndClaim addClaim(int chunkX, int chunkZ, int radius, Shape shape);
+    ChunkAndClaim addClaim(int chunkX, int chunkZ, int radius, ChunkClaim.Shape shape);
 
     /**
      * Adds a claim to a chunk.
      * Adding a claim can take an undefined period of time, chunk generation might have to happen first.
      * Claims added with this method will make the chunk fully generate.
-     * This method uses a default shape of {@link Shape#SQUARE}
+     * This method uses a default shape of {@link ChunkClaim.Shape#SQUARE}
      *
      * @param chunkX   the chunk X, in chunk coordinate space
      * @param chunkZ   the chunk Z, in chunk coordinate space
@@ -261,7 +275,7 @@ public interface ChunkManager {
      * Adding a claim can take an undefined period of time, chunk generation might have to happen first.
      * Claims added with this method will make the chunk fully generate.
      * <p>
-     * Same as {@link #addClaim(int, int, int, int, Shape, ClaimCallbacks) addClaim(chunkX, chunkZ, radius, priority, shape, null)}
+     * Same as {@link #addClaim(int, int, int, int, ChunkClaim.Shape, ClaimCallbacks) addClaim(chunkX, chunkZ, radius, priority, shape, null)}
      *
      * @param chunkX   the chunk X, in chunk coordinate space
      * @param chunkZ   the chunk Z, in chunk coordinate space
@@ -270,7 +284,7 @@ public interface ChunkManager {
      * @param shape    the shape of the claim. Only matters with radius >= 1
      * @return the {@link ChunkAndClaim} used to remove the claim.
      */
-    ChunkAndClaim addClaim(int chunkX, int chunkZ, int radius, int priority, Shape shape);
+    ChunkAndClaim addClaim(int chunkX, int chunkZ, int radius, int priority, ChunkClaim.Shape shape);
 
     /**
      * Adds a claim to a chunk.
@@ -285,7 +299,7 @@ public interface ChunkManager {
      * @param callbacks the callbacks to use for this claim
      * @return the {@link ChunkAndClaim} used to remove the claim.
      */
-    ChunkAndClaim addClaim(int chunkX, int chunkZ, int radius, int priority, Shape shape, @Nullable ClaimCallbacks callbacks);
+    ChunkAndClaim addClaim(int chunkX, int chunkZ, int radius, int priority, ChunkClaim.Shape shape, @Nullable ClaimCallbacks callbacks);
 
     /**
      * Removes a claim from a chunk.
@@ -296,7 +310,7 @@ public interface ChunkManager {
      * @param claim the {@link ChunkClaim} that should be removed
      * @return a future for when the claim was removed.
      */
-    CompletableFuture<Void> removeClaim(ChunkClaim claim);
+    CompletableFuture<@Nullable Void> removeClaim(ChunkClaim claim);
 
     /**
      * Saves the current instance tags
@@ -309,7 +323,7 @@ public interface ChunkManager {
      * If not, please state your use case and open an issue on GitHub
      */
     @Deprecated
-    CompletableFuture<Void> saveInstanceData();
+    CompletableFuture<@Nullable Void> saveInstanceData();
 
     /**
      * Saves a {@link Chunk} to storage.
@@ -320,7 +334,7 @@ public interface ChunkManager {
      * If not, please state your use case and open an issue on GitHub
      */
     @Deprecated
-    CompletableFuture<Void> saveChunk(Chunk chunk);
+    CompletableFuture<@Nullable Void> saveChunk(Chunk chunk);
 
     /**
      * Saves all loaded chunks to storage.
@@ -331,7 +345,7 @@ public interface ChunkManager {
      * If not, please state your use case and open an issue on GitHub
      */
     @Deprecated
-    CompletableFuture<Void> saveChunks();
+    CompletableFuture<@Nullable Void> saveChunks();
 
     /**
      * Saves the instance data and all chunks to storage
@@ -343,7 +357,7 @@ public interface ChunkManager {
      * If not, please state your use case and open an issue on GitHub
      */
     @Deprecated
-    CompletableFuture<Void> saveInstanceDataAndChunks();
+    CompletableFuture<@Nullable Void> saveInstanceDataAndChunks();
 
 
     /**

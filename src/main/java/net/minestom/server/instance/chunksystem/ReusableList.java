@@ -2,7 +2,12 @@ package net.minestom.server.instance.chunksystem;
 
 import org.jetbrains.annotations.Nullable;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.ConcurrentModificationException;
+import java.util.Iterator;
+import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.Objects;
 
 /**
  * A list that allows reusing its iterators, and other aspects, to minimize allocations.
@@ -39,7 +44,7 @@ class ReusableList<T> implements Iterable<T> {
     private void ensureCapacity(int minCapacity) {
         if (data.length >= minCapacity) return;
 
-        var newLength = data.length;
+        int newLength = data.length;
         while (newLength <= minCapacity) newLength <<= 1;
 
         var newData = new Object[newLength];
@@ -55,8 +60,14 @@ class ReusableList<T> implements Iterable<T> {
 
     @Override
     public Iterator<T> iterator() {
-        if (iterator != null) return lastIterator = iterator.reset();
-        return lastIterator = new ReusableIterator().reset();
+        if (iterator != null) {
+            var it  = iterator.reset();
+            lastIterator = it;
+            return it;
+        }
+        var it = new ReusableIterator().reset();
+        lastIterator = it;
+        return it;
     }
 
     public void reuseLastIterator() {

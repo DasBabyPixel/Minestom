@@ -10,29 +10,29 @@ public class FixedSizeAtomicBitSet {
     }
 
     public void set(int pos) {
-        var idx = idx(pos);
-        var bit = 1 << pos;
+        int idx = idx(pos);
+        int bit = 1 << pos;
         while (true) {
-            var val = array.get(idx);
+            int val = array.get(idx);
             if ((val & bit) != 0) return; // Already set
             if (array.compareAndSet(idx, val, val | bit)) return;
         }
     }
 
     public void clear(int pos) {
-        var idx = idx(pos);
-        var bit = 1 << pos;
+        int idx = idx(pos);
+        int bit = 1 << pos;
         while (true) {
-            var val= array.get(idx);
+            int val= array.get(idx);
             if ((val & bit) == 0) return; // Already cleared
             if (array.compareAndSet(idx, val, val ^ bit)) return;
         }
     }
 
     public boolean get(int pos) {
-        var bit = 1 << pos;
-        var idx = idx(pos);
-        var val = array.get(idx) & bit;
+        int bit = 1 << pos;
+        int idx = idx(pos);
+        int val = array.get(idx) & bit;
         return val != 0;
     }
 

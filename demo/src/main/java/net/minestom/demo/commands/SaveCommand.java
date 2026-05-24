@@ -18,9 +18,12 @@ public class SaveCommand extends Command {
         addSyntax(SaveCommand::execute);
     }
 
+    @SuppressWarnings("deprecation")
     private static void execute(CommandSender commandSender, CommandContext commandContext) {
         for(var instance : MinecraftServer.getInstanceManager().getInstances()) {
-            CompletableFuture<Void> instanceSave = instance.saveInstance().thenCompose(_ -> instance.saveChunksToStorage());
+            CompletableFuture<Void> instanceSave = instance
+                    .saveInstance()
+                    .thenCompose(_ -> instance.saveChunksToStorage());
             try {
                 instanceSave.get();
             } catch (InterruptedException | ExecutionException e) {

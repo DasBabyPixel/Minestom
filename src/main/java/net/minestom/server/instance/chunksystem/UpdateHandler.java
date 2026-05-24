@@ -12,9 +12,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 import static net.minestom.server.coordinate.CoordConversion.chunkIndex;
@@ -50,8 +50,8 @@ class UpdateHandler {
             // Claim of update no longer exists, update is invalid
             return UpdateResult.INVALID_UPDATE;
         }
-        var x = update.x();
-        var z = update.z();
+        int x = update.x();
+        int z = update.z();
         this.singleThreadedManager.tree.findEntries(this.claimEntryCache, x, z);
         if (this.claimEntryCache.isEmpty()) {
             return this.updateNoRemainingClaims(update, disablePropagation);
@@ -64,9 +64,9 @@ class UpdateHandler {
     }
 
     private UpdateResult updateWithClaims(PrioritizedUpdate update, boolean disablePropagation, ReusableList<ChunkClaimTree.CompleteEntry> entries) {
-        var x = update.x();
-        var z = update.z();
-        var chunkIndex = chunkIndex(x, z);
+        int x = update.x();
+        int z = update.z();
+        long chunkIndex = chunkIndex(x, z);
 
         if (update.updateType().isUnload()) {
             var claimData = this.singleThreadedManager.claimMap.get(update.origin());
@@ -81,7 +81,7 @@ class UpdateHandler {
         }
 
         var highestEntry = this.singleThreadedManager.tree.findHighestPriorityEntry(entries, this.singleThreadedManager.priorityDrop, x, z);
-        var highestPriority = highestEntry.entry().priority();
+        int highestPriority = highestEntry.entry().priority();
         if (update.priority() - Vec.EPSILON > highestPriority) {
             // The Priority of the update is higher than the highest priority claim.
             // This update is stale (from an origin with higher priority) and can be ignored
@@ -130,7 +130,7 @@ class UpdateHandler {
         };
     }
 
-    private void callbackLoaded(SingleThreadedManager.ClaimData claimData, Chunk chunk) {
+    private static void callbackLoaded(SingleThreadedManager.ClaimData claimData, Chunk chunk) {
         var claim = claimData.claim;
         var cb = claim.callbacks();
         if (cb != null) {
@@ -151,8 +151,8 @@ class UpdateHandler {
     }
 
     private UpdateResult updateLoadChunkFromMemory(PrioritizedUpdate update, SingleThreadedManager.ClaimData claimData, State.Unloading unloading) {
-        var x = update.x();
-        var z = update.z();
+        int x = update.x();
+        int z = update.z();
         if (unloading.partitionDeleted.isDone()) {
             if (!ChunkWorker.tryReserve()) {
                 return UpdateResult.WAITING_FOR_WORKER;
@@ -175,8 +175,8 @@ class UpdateHandler {
             return UpdateResult.WAITING_FOR_WORKER;
         }
 
-        var x = update.x();
-        var z = update.z();
+        int x = update.x();
+        int z = update.z();
 
         this.startLoad(claimData, update.origin(), x, z);
 
@@ -186,7 +186,7 @@ class UpdateHandler {
     }
 
     private void startLoad(SingleThreadedManager.ClaimData claimData, ChunkClaim claim, int x, int z) {
-        var chunkIndex = chunkIndex(x, z);
+        long chunkIndex = chunkIndex(x, z);
         var loading = new State.Loading();
         if (loading.claimsRegisteredForCallback.add(claim)) {
             claimData.startLoad();
@@ -207,33 +207,29 @@ class UpdateHandler {
             // Just ignore this and don't propagate
             return UpdateResult.INVALID_UPDATE;
         }
-        var x = update.x();
-        var z = update.z();
-        var chunkIndex = chunkIndex(x, z);
+        int x = update.x();
+        int z = update.z();
+        long chunkIndex = chunkIndex(x, z);
         var currentState = this.chunks.remove(chunkIndex);
         this.singleThreadedManager.updateQueue.propagateUpdates(update, null, disablePropagation);
-        switch (currentState) {
+        return switch (currentState) {
             case State.Loaded loaded -> {
                 this.unloadChunk(loaded.chunk, currentState);
-                return UpdateResult.UNLOAD_SCHEDULED;
+                yield UpdateResult.UNLOAD_SCHEDULED;
             }
-            case State.Loading ignored -> {
-                // Chunk is loading, if we don't want it, we do nothing.
+            case State.Loading _ -> // Chunk is loading, if we don't want it, we do nothing.
                 // Chunk is already removed from the HashMap, will be removed from
                 // loadingChunks once fully removed
-                return UpdateResult.UNLOAD_SCHEDULED;
-            }
-            case null, default -> {
-                // Already unloaded. We only propagate updates
-                return UpdateResult.INVALID_UPDATE;
-            }
-        }
+                    UpdateResult.UNLOAD_SCHEDULED;
+            case null, default -> // Already unloaded. We only propagate updates
+                    UpdateResult.INVALID_UPDATE;
+        };
     }
 
     private void unloadChunk(Chunk chunk, State currentState) {
-        var x = chunk.getChunkX();
-        var z = chunk.getChunkZ();
-        var chunkIndex = chunkIndex(x, z);
+        int x = chunk.getChunkX();
+        int z = chunk.getChunkZ();
+        long chunkIndex = chunkIndex(x, z);
 
         if (currentState instanceof State.Unloading) {
             // Already unloading, nothing to do
@@ -247,16 +243,16 @@ class UpdateHandler {
 
     void finishUnloadAfterSaveAndPartition(State.Unloading unloading) {
         var chunk = unloading.chunk;
-        var x = chunk.getChunkX();
-        var z = chunk.getChunkZ();
-        var chunkIndex = chunkIndex(x, z);
+        int x = chunk.getChunkX();
+        int z = chunk.getChunkZ();
+        long chunkIndex = chunkIndex(x, z);
         this.chunks.remove(chunkIndex, unloading);
     }
 
     void saveChunk(Chunk chunk, CompletableFuture<Void> saveFuture) {
-        var x = chunk.getChunkX();
-        var z = chunk.getChunkZ();
-        var chunkIndex = chunkIndex(x, z);
+        int x = chunk.getChunkX();
+        int z = chunk.getChunkZ();
+        long chunkIndex = chunkIndex(x, z);
         var saveTask = this.savingChunks.get(chunkIndex);
         if (saveTask != null) {
             // An existing save request for a chunk at the given location already exists.
@@ -277,9 +273,9 @@ class UpdateHandler {
     private void saveChunk0(SaveState saveState) {
         // Saving uses a custom pool so it doesn't clog the worker pool
         var chunk = saveState.chunk;
-        var x = chunk.getChunkX();
-        var z = chunk.getChunkZ();
-        var chunkIndex = chunkIndex(x, z);
+        int x = chunk.getChunkX();
+        int z = chunk.getChunkZ();
+        long chunkIndex = chunkIndex(x, z);
         this.savingChunks.put(chunkIndex, saveState);
         this.singleThreadedManager.startSavingChunk(chunk, saveState);
         if (callbacks != null) {
@@ -288,9 +284,9 @@ class UpdateHandler {
     }
 
     void saveChunkCompleted(Chunk chunk) {
-        var x = chunk.getChunkX();
-        var z = chunk.getChunkZ();
-        var chunkIndex = chunkIndex(x, z);
+        int x = chunk.getChunkX();
+        int z = chunk.getChunkZ();
+        long chunkIndex = chunkIndex(x, z);
         var saveTask = this.savingChunks.remove(chunkIndex);
         assert saveTask != null;
         if (callbacks != null) {
@@ -339,9 +335,9 @@ class UpdateHandler {
     }
 
     boolean tryChangeToLoaded(Chunk chunk) {
-        var x = chunk.getChunkX();
-        var z = chunk.getChunkZ();
-        var chunkIndex = chunkIndex(x, z);
+        int x = chunk.getChunkX();
+        int z = chunk.getChunkZ();
+        long chunkIndex = chunkIndex(x, z);
         var loading = this.loadingChunks.remove(chunkIndex);
         assert loading != null;
         this.singleThreadedManager.tree.findEntries(this.claimEntryCache, x, z);
@@ -376,7 +372,7 @@ class UpdateHandler {
     }
 
     @Nullable Chunk getLoaded(int x, int z) {
-        var chunkIndex = CoordConversion.chunkIndex(x, z);
+        long chunkIndex = CoordConversion.chunkIndex(x, z);
         var state = chunks.get(chunkIndex);
         if (state instanceof State.Loaded loaded) {
             return loaded.chunk;
@@ -412,7 +408,7 @@ class UpdateHandler {
 
     sealed abstract static class State {
         static final class Loading extends State {
-            final Collection<ChunkClaim> claimsRegisteredForCallback = new HashSet<>();
+            final Set<ChunkClaim> claimsRegisteredForCallback = new HashSet<>();
         }
 
         static final class Loaded extends State {

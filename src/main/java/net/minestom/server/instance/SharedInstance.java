@@ -8,7 +8,6 @@ import net.minestom.server.instance.block.BlockHandler;
 import net.minestom.server.instance.chunksystem.ChunkManager;
 import net.minestom.server.instance.generator.Generator;
 import net.minestom.server.utils.chunk.ChunkSupplier;
-import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Collection;
@@ -68,21 +67,25 @@ public class SharedInstance extends Instance {
     }
 
     @Override
-    public Chunk getChunk(int chunkX, int chunkZ) {
+    @Deprecated
+    public @Nullable Chunk getChunk(int chunkX, int chunkZ) {
         return instanceContainer.getChunk(chunkX, chunkZ);
     }
 
     @Override
+    @Deprecated
     public CompletableFuture<@Nullable Void> saveInstance() {
         return instanceContainer.saveInstance();
     }
 
     @Override
+    @Deprecated
     public CompletableFuture<@Nullable Void> saveChunkToStorage(Chunk chunk) {
         return instanceContainer.saveChunkToStorage(chunk);
     }
 
     @Override
+    @Deprecated
     public CompletableFuture<@Nullable Void> saveChunksToStorage() {
         return instanceContainer.saveChunksToStorage();
     }

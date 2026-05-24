@@ -38,8 +38,8 @@ public interface PriorityDrop {
     record HypotenuseSquared() implements PriorityDrop {
         @Override
         public double calculate(int claimX, int claimZ, int x, int z) {
-            var dx = claimX - x;
-            var dz = claimZ - z;
+            int dx = claimX - x;
+            int dz = claimZ - z;
             return dx * dx + dz * dz;
         }
     }
@@ -50,8 +50,8 @@ public interface PriorityDrop {
     record Hypotenuse() implements PriorityDrop {
         @Override
         public double calculate(int claimX, int claimZ, int x, int z) {
-            var dx = claimX - x;
-            var dz = claimZ - z;
+            int dx = claimX - x;
+            int dz = claimZ - z;
             return Math.sqrt(dx * dx + dz * dz);
         }
     }

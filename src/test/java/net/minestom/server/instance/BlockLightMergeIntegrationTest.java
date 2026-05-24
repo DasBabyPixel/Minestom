@@ -7,8 +7,11 @@ import net.minestom.testing.Env;
 import net.minestom.testing.EnvTest;
 import org.junit.jupiter.api.Test;
 
-import java.util.*;
-import java.util.concurrent.locks.LockSupport;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import static java.util.Map.entry;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -618,6 +621,7 @@ public class BlockLightMergeIntegrationTest {
     }
 
     // We shouldn't have to wait for light, it should automatically update
+    @SuppressWarnings("UnusedVariable")
     private static void awaitLight(Collection<? extends Chunk> chunks) {
 //        for (var chunk : chunks) {
 //            ((LightingChunk) chunk).awaitLight();
@@ -625,6 +629,7 @@ public class BlockLightMergeIntegrationTest {
     }
 
     // We shouldn't have to wait for light, it should automatically update
+    @SuppressWarnings("UnusedVariable")
     private static void awaitLight(Instance instance, int sectionX, int sectionY, int sectionZ) {
 //        var chunk = (LightingChunk) instance.getChunk(sectionX, sectionZ);
 //        chunk.awaitLight();

@@ -10,7 +10,6 @@ import net.minestom.server.entity.Player;
 import net.minestom.server.event.player.PlayerMoveEvent;
 import net.minestom.server.instance.Chunk;
 import net.minestom.server.instance.Instance;
-import net.minestom.server.instance.chunksystem.ChunkClaim;
 import net.minestom.server.message.ChatMessageType;
 import net.minestom.server.network.packet.client.common.ClientSettingsPacket;
 import net.minestom.server.network.packet.client.play.ClientPlayerPositionPacket;
@@ -124,6 +123,7 @@ public class PlayerMovementIntegrationTest {
     }
 
     @Test
+    @SuppressWarnings("FutureReturnValueIgnored")
     public void testClientViewDistanceSettings(Env env) {
         int viewDistance = 4;
         final Instance flatInstance = env.createFlatInstance();
@@ -147,15 +147,15 @@ public class PlayerMovementIntegrationTest {
         chunkDataPacketCollector.assertCount(ChunkRange.chunksCount(player.effectiveViewDistance()));
     }
 
-    private int countInShape(ChunkClaim.Shape shape, int radius) {
-        int count = 0;
-        for (var x = -radius; x <= radius; x++) {
-            for (var z = -radius; z <= radius; z++) {
-                if (shape.isInRadius(radius, radius, x, z, 0, 0)) count++;
-            }
-        }
-        return count;
-    }
+//    private int countInShape(ChunkClaim.Shape shape, int radius) {
+//        int count = 0;
+//        for (var x = -radius; x <= radius; x++) {
+//            for (var z = -radius; z <= radius; z++) {
+//                if (shape.isInRadius(radius, radius, x, z, 0, 0)) count++;
+//            }
+//        }
+//        return count;
+//    }
 
     @Test
     public void testSettingsViewDistanceExpansionAndShrink(Env env) {

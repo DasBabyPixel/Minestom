@@ -19,8 +19,6 @@ public class SnapshotLightSection implements LightSection<SnapshotLightSection, 
     private final AtomicInteger version = new AtomicInteger();
     private final AtomicBoolean blockDirty = new AtomicBoolean();
     private final AtomicBoolean skyDirty = new AtomicBoolean();
-    private @Nullable SnapshotLightSection up;
-    private @Nullable SnapshotLightSection down;
 
     public SnapshotLightSection(ChunkData chunkData, @Nullable Section section, int sectionY) {
         this.chunkData = chunkData;
@@ -120,7 +118,5 @@ public class SnapshotLightSection implements LightSection<SnapshotLightSection, 
 
     @Override
     public void initAboveBelow(@Nullable SnapshotLightSection above, @Nullable SnapshotLightSection below) {
-        up = above;
-        down = below;
     }
 }

@@ -11,7 +11,6 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Arrays;
 import java.util.Objects;
-import java.util.function.Function;
 
 import static net.minestom.server.coordinate.CoordConversion.SECTION_BLOCK_COUNT;
 
@@ -93,17 +92,17 @@ public final class LightCompute {
                 // Section
                 final int newIndex = index3x3(xO, yO, zO);
                 final Block targetBlock = getBlock(blockPalettes[sectionIdxO], xO & 0xF, yO & 0xF, zO & 0xF);
-                final int opacity = targetBlock.registry().lightBlocked();
+                final int opacity = targetBlock.lightBlocked();
                 final byte newLightLevel = (byte) Math.max(lightLevel - Math.max(opacity, 1), 0);
 
                 if (getLight(lightArrays[sectionIdxO], newIndex) < newLightLevel) {
                     final Block currentBlock = getBlock(blockPalettes[sectionIdx], x, y, z);
                     final Block propagatedBlock = getBlock(blockPalettes[sectionIdxO], xO & 0xF, yO & 0xF, zO & 0xF);
 
-                    final Shape currentShape = currentBlock.registry().occlusionShape();
-                    final Shape propagatedShape = propagatedBlock.registry().occlusionShape();
+                    final Shape currentShape = currentBlock.occlusionShape();
+                    final Shape propagatedShape = propagatedBlock.occlusionShape();
 
-                    final boolean airAir = currentBlock.isAir() && propagatedBlock.isAir();
+                    final boolean airAir = currentBlock.air() && propagatedBlock.air();
                     if (!airAir && currentShape.isOccluded(propagatedShape, BlockFace.fromDirection(direction)))
                         continue;
 
@@ -111,7 +110,7 @@ public final class LightCompute {
                     final int sectionXO = (absXO >> 4) & 0x3;
                     final int sectionYO = (absYO >> 4) & 0x3;
                     final int sectionZO = (absZO >> 4) & 0x3;
-                    final int sectionPos = (sectionYO << 4) | (sectionZO << 2) | (sectionXO);
+                    final int sectionPos = (sectionYO << 4) | (sectionZO << 2) | sectionXO;
                     lightSources.enqueue((sectionPos << 21) | (sectionIdxO << 16) | newIndex | (newLightLevel << 12));
                 }
             }
@@ -186,7 +185,7 @@ public final class LightCompute {
                 // Section
                 final int newIndex = xO | (zO << 4) | (yO << 8);
                 final Block targetBlock = Objects.requireNonNullElse(getBlock(blockPalette, xO, yO, zO), Block.AIR);
-                final int opacity = targetBlock.registry().lightBlocked();
+                final int opacity = targetBlock.lightBlocked();
                 final byte newLightLevel = (byte) Math.max(lightLevel - Math.max(opacity, 1), 0);
 
                 if (getLight(lightArray, newIndex) < newLightLevel) {
@@ -219,9 +218,9 @@ public final class LightCompute {
     }
 
     public static int sectionIdx3x3(int x, int y, int z) {
-        var sx = x >> 4;
-        var sy = y >> 4;
-        var sz = z >> 4;
+        int sx = x >> 4;
+        int sy = y >> 4;
+        int sz = z >> 4;
         return sy + sx * 3 + sz * 9;
     }
 

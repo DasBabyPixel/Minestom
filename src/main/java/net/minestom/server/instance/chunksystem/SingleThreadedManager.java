@@ -26,17 +26,22 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import space.vectrix.flare.fastutil.Long2ObjectSyncMap;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static net.minestom.server.coordinate.CoordConversion.chunkIndex;
-import static net.minestom.server.instance.chunksystem.TaskSchedulerThread.Task;
 import static net.minestom.server.instance.chunksystem.TaskSchedulerThread.link;
 
 @SuppressWarnings("DuplicatedCode")
 class SingleThreadedManager {
+    @SuppressWarnings("StaticAssignmentOfThrowable")
+    private static final CancellationException CLAIM_REMOVED = new CancellationException("Claim was removed");
     static @Nullable InternalCallbacks callbacks = null;
     private static final Logger LOGGER = LoggerFactory.getLogger(SingleThreadedManager.class);
 
@@ -126,7 +131,7 @@ class SingleThreadedManager {
      * This method is responsible for selecting and submitting the chunks to load.
      */
     IterationResult workIteration() {
-        var count = 0;
+        int count = 0;
         while (true) {
             if (count++ == 5) {
                 // Exit this loop and restart it, this makes sure all tasks are handled
@@ -138,14 +143,14 @@ class SingleThreadedManager {
             var update = this.updateQueue.dequeue();
             if (update == null) break;
             var claimData = this.claimMap.get(update.origin());
-            var disablePropagation = this.updateQueue.lastRemovedDisablePropagation();
+            boolean disablePropagation = this.updateQueue.lastRemovedDisablePropagation();
 
             var result = this.updateHandler.workUpdate(update, disablePropagation);
             if (result instanceof UpdateResult.WaitingForWorker) {
                 // The worker is busy. Exit loop here
                 // This is to make sure we keep processing new incoming unloads/removeClaims, even
                 // if another update that was processed wants us to wait for a worker.
-                var updatedSinceLastReset = this.updateQueue.resetUpdated();
+                boolean updatedSinceLastReset = this.updateQueue.resetUpdated();
                 // We need to submit the update again, it hasn't been handled yet
                 this.updateQueue.enqueue(update, null);
                 this.updateQueue.resetUpdated();
@@ -153,8 +158,8 @@ class SingleThreadedManager {
                     return IterationResult.RUN_AGAIN;
                 }
                 return IterationResult.WAIT_FOR_SIGNAL_OR_WORKER;
-            } else if (result instanceof UpdateResult.WaitingForFuture(var future, var d)) {
-                future.whenComplete((_, _) -> this.taskSchedulerThread.addTask(new Task.EnqueueUpdate(update, claimData, d)));
+            } else if (result instanceof UpdateResult.WaitingForFuture(var future, boolean d)) {
+                var _ = future.whenComplete((_, _) -> this.taskSchedulerThread.addTask(new TaskSchedulerThread.Task.EnqueueUpdate(update, claimData, d)));
                 continue;
             }
 
@@ -172,12 +177,12 @@ class SingleThreadedManager {
 
     void addClaim(ChunkAndClaim chunkAndClaim) {
         var claim = chunkAndClaim.claim();
-        var x = claim.chunkX();
-        var z = claim.chunkZ();
+        int x = claim.chunkX();
+        int z = claim.chunkZ();
         this.tree.insert(x, z, claim.radius(), claim.priority(), claim.shape());
 
         var claimData = new ClaimData(claim, chunkAndClaim.chunkFuture());
-        var chunkIndex = chunkIndex(x, z);
+        long chunkIndex = chunkIndex(x, z);
         this.claimMap.put(claim, claimData);
         this.claimsByChunk.computeIfAbsent(chunkIndex, _ -> new HashSet<>(4)).add(claimData);
 
@@ -194,12 +199,12 @@ class SingleThreadedManager {
 
     void addCopiedClaim(ChunkAndClaim chunkAndClaim) {
         var claim = chunkAndClaim.claim();
-        var x = claim.chunkX();
-        var z = claim.chunkZ();
+        int x = claim.chunkX();
+        int z = claim.chunkZ();
         this.tree.insert(x, z, claim.radius(), claim.priority(), claim.shape());
 
         var claimData = new ClaimData(claim, chunkAndClaim.chunkFuture());
-        var chunkIndex = chunkIndex(x, z);
+        long chunkIndex = chunkIndex(x, z);
         this.claimMap.put(claim, claimData);
         this.claimsByChunk.computeIfAbsent(chunkIndex, _ -> new HashSet<>(4)).add(claimData);
     }
@@ -209,9 +214,9 @@ class SingleThreadedManager {
         var list = new ArrayList<ChunkAndClaim>();
         var dispatcher = MinecraftServer.process().dispatcher();
         for (var chunk : copiedChunks) {
-            var chunkX = chunk.getChunkX();
-            var chunkZ = chunk.getChunkZ();
-            var index = CoordConversion.chunkIndex(chunkX, chunkZ);
+            int chunkX = chunk.getChunkX();
+            int chunkZ = chunk.getChunkZ();
+            long index = CoordConversion.chunkIndex(chunkX, chunkZ);
             var claim = new ChunkClaimImpl(chunkX, chunkZ, 0, priority, ChunkClaim.Shape.SQUARE, null);
             var chunkAndClaim = new ChunkAndClaim(CompletableFuture.completedFuture(chunk), claim);
             copyTarget.addCopiedClaim(chunkAndClaim);
@@ -225,31 +230,40 @@ class SingleThreadedManager {
     }
 
     void removeClaim(ChunkClaim claim, CompletableFuture<@Nullable Void> future) {
-        var claimedChunk = this.claimMap.remove(claim);
-        if (claimedChunk == null) {
-            this.taskSchedulerThread.completeExceptionally(future, new IllegalStateException("The claim you attempted to remove is not valid"));
-            return;
+        try {
+            var claimData = removeClaimInternal(claim);
+            this.taskSchedulerThread.complete(future, null);
+            this.taskSchedulerThread.completeExceptionally(claimData.mainChunkFuture, CLAIM_REMOVED);
+        } catch (Throwable t) {
+            this.taskSchedulerThread.completeExceptionally(future, t);
         }
-        var x = claimedChunk.claim.chunkX();
-        var z = claimedChunk.claim.chunkZ();
-        var chunkIndex = chunkIndex(x, z);
+    }
+
+    private ClaimData removeClaimInternal(ChunkClaim claim) {
+        var claimData = this.claimMap.remove(claim);
+        if (claimData == null) {
+            throw new IllegalStateException("The claim you attempted to remove is not valid");
+        }
+        int x = claimData.claim.chunkX();
+        int z = claimData.claim.chunkZ();
+        long chunkIndex = chunkIndex(x, z);
         var claims = this.claimsByChunk.get(chunkIndex);
-        claims.remove(claimedChunk);
+        claims.remove(claimData);
         if (claims.isEmpty()) {
             this.claimsByChunk.remove(chunkIndex);
         }
 
         this.tree.delete(x, z, claim.radius(), claim.priority(), claim.shape());
-        this.submitUpdate(x, z, UpdateType.REMOVE_CLAIM_EXPLICIT, claim, claimedChunk);
+        this.submitUpdate(x, z, UpdateType.REMOVE_CLAIM_EXPLICIT, claim, claimData);
         // We can complete the future right here, the claim was removed.
         // Removing a claim makes no guarantees about when the chunk is unloaded, so this is the easiest
         // and most obvious place to complete the future
-        this.taskSchedulerThread.complete(future, null);
-        this.taskSchedulerThread.completeExceptionally(claimedChunk.mainChunkFuture, new CancellationException("Claim was removed"));
+        this.taskSchedulerThread.completeExceptionally(claimData.mainChunkFuture, CLAIM_REMOVED);
 
         if (callbacks != null) {
             callbacks.onRemoveClaim(x, z, claim);
         }
+        return claimData;
     }
 
     boolean hasClaim(ChunkClaim claim) {
@@ -311,10 +325,21 @@ class SingleThreadedManager {
         link(CompletableFuture.allOf(chunks, data), future);
     }
 
+    void chunkGenerationFail(int x, int z, Throwable t) {
+        long chunkIndex = chunkIndex(x, z);
+        var claims = this.claimsByChunk.get(chunkIndex);
+        if (claims != null) {
+            for (var claimData : List.copyOf(claims)) {
+                this.taskSchedulerThread.completeExceptionally(claimData.mainChunkFuture, t);
+                removeClaimInternal(claimData.claim);
+            }
+        }
+    }
+
     void chunkGenerationFinished(Chunk chunk) {
         // The claim may have been removed by now. We will first have to check that
-        var x = chunk.getChunkX();
-        var z = chunk.getChunkZ();
+        int x = chunk.getChunkX();
+        int z = chunk.getChunkZ();
         if (callbacks != null) {
             callbacks.onGenerationCompleted(x, z);
         }
@@ -322,7 +347,7 @@ class SingleThreadedManager {
             return;
         }
 
-        var chunkIndex = chunkIndex(x, z);
+        long chunkIndex = chunkIndex(x, z);
         var claims = this.claimsByChunk.get(chunkIndex);
         if (claims != null) {
             for (var claim : claims) {
@@ -347,7 +372,7 @@ class SingleThreadedManager {
         if (!ServerFlag.ASYNC_CHUNK_SYSTEM) {
             task.run();
         } else {
-            this.scheduleOnChunk(chunk, task);
+            scheduleOnChunk(chunk, task);
         }
     }
 
@@ -358,19 +383,19 @@ class SingleThreadedManager {
             var saveFuture = new CompletableFuture<Void>();
 
             this.saveChunk(chunk, saveFuture);
-            saveFuture.whenComplete((_, throwable) -> {
+            var _ = saveFuture.whenComplete((_, throwable) -> {
                 if (throwable != null) {
                     MinecraftServer.getExceptionManager().handleException(new ChunkSystemException("Exception when saving chunk", throwable));
                     return;
                 }
-                this.taskSchedulerThread.addTask(new Task.FinishUnloadAfterSaveAndPartition(unloading));
+                this.taskSchedulerThread.addTask(new TaskSchedulerThread.Task.FinishUnloadAfterSaveAndPartition(unloading));
             });
         } else {
             this.finishUnloadChunkAfterSaveAndPartition(unloading);
         }
         if (callbacks != null) {
-            var x = chunk.getChunkX();
-            var z = chunk.getChunkZ();
+            int x = chunk.getChunkX();
+            int z = chunk.getChunkZ();
             callbacks.onUnloadCompleted(x, z);
         }
     }
@@ -400,7 +425,7 @@ class SingleThreadedManager {
         }
     }
 
-    private void scheduleOnChunk(Chunk chunk, Runnable task) {
+    private static void scheduleOnChunk(Chunk chunk, Runnable task) {
         chunk.getScheduler().scheduleTask(task, TaskSchedule.tick(10), TaskSchedule.stop());
 //        chunk.getScheduler().scheduleNextProcess(task); TODO use this again, line above is to provoke problems while debugging
     }
@@ -436,9 +461,9 @@ class SingleThreadedManager {
 
     void startUnloadChunk(UpdateHandler.State.Unloading unloading) {
         var chunk = unloading.chunk;
-        var x = chunk.getChunkX();
-        var z = chunk.getChunkZ();
-        var chunkIndex = chunkIndex(x, z);
+        int x = chunk.getChunkX();
+        int z = chunk.getChunkZ();
+        long chunkIndex = chunkIndex(x, z);
         if (callbacks != null) {
             callbacks.onUnloadStarted(x, z);
         }
@@ -466,7 +491,7 @@ class SingleThreadedManager {
             }
             this.taskSchedulerThread.complete(unloading.partitionDeleted, null);
             Thread.startVirtualThread(() -> {
-                this.taskSchedulerThread.addTask(new Task.FinishUnloadAfterPartition(unloading));
+                this.taskSchedulerThread.addTask(new TaskSchedulerThread.Task.FinishUnloadAfterPartition(unloading));
                 this.taskTracking.runningTickScheduledCount.decrementAndGet();
             });
         };
@@ -475,7 +500,7 @@ class SingleThreadedManager {
             runChunk.run();
         } else {
             this.instance.scheduler().scheduleNextProcess(runInstance);
-            this.scheduleOnChunk(chunk, runChunk);
+            scheduleOnChunk(chunk, runChunk);
         }
     }
 
@@ -572,7 +597,7 @@ class SingleThreadedManager {
         }
 
         void finishLoad() {
-            var loads = counter.decrementAndGet();
+            int loads = counter.decrementAndGet();
 
             if (loads == 0) {
                 var callbacks = claim.callbacks();

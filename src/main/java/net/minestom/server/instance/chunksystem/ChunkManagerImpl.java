@@ -59,6 +59,7 @@ class ChunkManagerImpl implements ChunkManager {
     }
 
     @Override
+    @Deprecated
     public CompletableFuture<Void> saveInstanceData() {
         var future = new CompletableFuture<Void>();
         this.taskSchedulerThread.saveInstanceDataAsync(future);
@@ -66,6 +67,7 @@ class ChunkManagerImpl implements ChunkManager {
     }
 
     @Override
+    @Deprecated
     public CompletableFuture<Void> saveChunk(Chunk chunk) {
         var future = new CompletableFuture<Void>();
         this.taskSchedulerThread.saveChunkAsync(chunk, future);
@@ -73,6 +75,7 @@ class ChunkManagerImpl implements ChunkManager {
     }
 
     @Override
+    @Deprecated
     public CompletableFuture<Void> saveChunks() {
         var future = new CompletableFuture<Void>();
         this.taskSchedulerThread.saveChunksAsync(future);
@@ -80,6 +83,7 @@ class ChunkManagerImpl implements ChunkManager {
     }
 
     @Override
+    @Deprecated
     public CompletableFuture<Void> saveInstanceDataAndChunks() {
         var future = new CompletableFuture<Void>();
         this.taskSchedulerThread.saveInstanceDataAndChunksAsync(future);

@@ -391,7 +391,7 @@ public abstract class Instance implements Block.Getter, Block.Setter, Biome.Gett
      * @deprecated see {@link ChunkManager#saveInstanceData()}
      */
     @Deprecated
-    public abstract CompletableFuture<Void> saveInstance();
+    public abstract CompletableFuture<@Nullable Void> saveInstance();
 
     /**
      * Saves a {@link Chunk} to permanent storage.
@@ -401,7 +401,7 @@ public abstract class Instance implements Block.Getter, Block.Setter, Biome.Gett
      * @deprecated see {@link ChunkManager#saveChunk(Chunk)}
      */
     @Deprecated
-    public abstract CompletableFuture<Void> saveChunkToStorage(Chunk chunk);
+    public abstract CompletableFuture<@Nullable Void> saveChunkToStorage(Chunk chunk);
 
     /**
      * Saves multiple chunks to permanent storage.
@@ -410,7 +410,7 @@ public abstract class Instance implements Block.Getter, Block.Setter, Biome.Gett
      * @deprecated see {@link ChunkManager#saveChunks()}
      */
     @Deprecated
-    public abstract CompletableFuture<Void> saveChunksToStorage();
+    public abstract CompletableFuture<@Nullable Void> saveChunksToStorage();
 
     public abstract void setChunkSupplier(ChunkSupplier chunkSupplier);
 

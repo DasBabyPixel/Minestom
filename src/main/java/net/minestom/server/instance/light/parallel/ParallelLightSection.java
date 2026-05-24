@@ -1,11 +1,17 @@
 package net.minestom.server.instance.light.parallel;
 
 import it.unimi.dsi.fastutil.shorts.ShortArrayFIFOQueue;
+import net.minestom.server.MinecraftServer;
 import net.minestom.server.instance.Section;
 import net.minestom.server.instance.block.Block;
 import net.minestom.server.instance.block.BlockFace;
-import net.minestom.server.instance.light.*;
+import net.minestom.server.instance.light.LightCompute;
+import net.minestom.server.instance.light.LightEngine;
 import net.minestom.server.instance.light.LightEngine.WorkTypeTracker;
+import net.minestom.server.instance.light.LightSection;
+import net.minestom.server.instance.light.LightSectionType;
+import net.minestom.server.instance.light.LightingChunk;
+import net.minestom.server.instance.light.Neighbors;
 import net.minestom.server.instance.palette.Palette;
 import net.minestom.server.utils.chunk.ChunkUtils;
 import org.jetbrains.annotations.ApiStatus;
@@ -67,6 +73,7 @@ public class ParallelLightSection implements LightSection<ParallelLightSection, 
     private final AtomicBoolean resendThisSectionBlockLight = new AtomicBoolean(false);
     private final AtomicBoolean resendThisSectionSkyLight = new AtomicBoolean(false);
 
+    @SuppressWarnings("this-escape")
     public ParallelLightSection(LightEngine engine, ChunkData chunkData, @Nullable Section chunkSection, int sectionY) {
         this.engine = engine;
         this.chunkData = chunkData;
@@ -98,7 +105,7 @@ public class ParallelLightSection implements LightSection<ParallelLightSection, 
                 negY, posY, negZ, posZ, negX, posX // Order must be same as order in BlockFace enum
         };
         var lightSources = new ShortArrayFIFOQueue(0);
-        for (var i = 0; i < neighbors.length; i++) {
+        for (int i = 0; i < neighbors.length; i++) {
             var neighbor = neighbors[i];
             if (neighbor == null) continue;
 
@@ -136,11 +143,11 @@ public class ParallelLightSection implements LightSection<ParallelLightSection, 
                         default -> getBlock(blockPalette, bx, k, by);
                     };
 
-                    final int opacity = blockTo.registry().lightBlocked();
+                    final int opacity = blockTo.lightBlocked();
                     final byte lightEmission = (byte) Math.max(neighborLight - Math.max(opacity, 1), 0);
                     if (lightEmission == 0) continue;
                     if (content != LightCompute.EMPTY_CONTENT) {
-                        final int internalEmission = (byte) (Math.max(LightCompute.getLight(content, posTo) - 1, 0));
+                        final int internalEmission = (byte) Math.max(LightCompute.getLight(content, posTo) - 1, 0);
                         if (lightEmission <= internalEmission) continue;
                     }
 
@@ -150,7 +157,7 @@ public class ParallelLightSection implements LightSection<ParallelLightSection, 
                         default -> getBlock(otherPalette, bx, 15 - k, by);
                     };
 
-                    if (blockFrom.registry().occlusionShape().isOccluded(blockTo.registry().occlusionShape(), face.getOppositeFace()))
+                    if (blockFrom.occlusionShape().isOccluded(blockTo.occlusionShape(), face.getOppositeFace()))
                         continue;
 
                     final int index = posTo | (lightEmission << 12);
@@ -222,6 +229,7 @@ public class ParallelLightSection implements LightSection<ParallelLightSection, 
         return blockData.get();
     }
 
+    @Override
     public byte[] getBlockLight() {
         return blockLight.get().data();
     }
@@ -234,6 +242,7 @@ public class ParallelLightSection implements LightSection<ParallelLightSection, 
         return skyLightInternal.get();
     }
 
+    @Override
     public byte[] getSkyLight() {
         return skyLight.get().data();
     }
@@ -254,12 +263,15 @@ public class ParallelLightSection implements LightSection<ParallelLightSection, 
         return getNextVersion(skyLightInternalVersion);
     }
 
-    private int getNextVersion(AtomicInteger version) {
+    private static int getNextVersion(AtomicInteger version) {
         return version.incrementAndGet();
     }
 
     public void blockChanged() {
-        runAsync(chunkData.trackerPalette, sectionY, this::blockChangedInternal);
+        runAsync(chunkData.trackerPalette, sectionY, this::blockChangedInternal).exceptionally(t -> {
+            MinecraftServer.getExceptionManager().handleException(t);
+            return null;
+        });
     }
 
     private void blockChangedInternal() {
@@ -270,7 +282,7 @@ public class ParallelLightSection implements LightSection<ParallelLightSection, 
     }
 
     private LightUpdateResult<SectionBlockData> cloneBlockData() {
-        var version = getNextVersion(blockDataVersion);
+        int version = getNextVersion(blockDataVersion);
         Palette blockPalette;
         int[] occlusionMap;
         if (chunkSection != null) {
@@ -291,13 +303,19 @@ public class ParallelLightSection implements LightSection<ParallelLightSection, 
     }
 
     private void scheduleFullRelight() {
-        runAsync(chunkData.trackerFullBlockRelight, sectionY, this::fullBlockRelight);
-        runAsync(chunkData.trackerFullSkyRelight, sectionY, this::fullSkyRelight);
+        runAsync(chunkData.trackerFullBlockRelight, sectionY, this::fullBlockRelight).exceptionally(t -> {
+            MinecraftServer.getExceptionManager().handleException(t);
+            return null;
+        });
+        runAsync(chunkData.trackerFullSkyRelight, sectionY, this::fullSkyRelight).exceptionally(t -> {
+            MinecraftServer.getExceptionManager().handleException(t);
+            return null;
+        });
     }
 
     private void bakeAfterRelightAndPropagate(int depth) {
         var blockLightBaked = bakeBlockLight();
-        var bakedLightChanged = blockLightBaked.asBoolean();
+        boolean bakedLightChanged = blockLightBaked.asBoolean();
         if (bakedLightChanged) {
             resendBlockLight();
             var oldData = blockLightBaked.oldData().data();
@@ -317,7 +335,7 @@ public class ParallelLightSection implements LightSection<ParallelLightSection, 
                 scheduleNeighborBlockRelight(neighborSnapshot.get(Neighbors.WEST), depth);
         }
         var skyLightBaked = bakeSkyLight();
-        var skyLightChanged = skyLightBaked.asBoolean();
+        boolean skyLightChanged = skyLightBaked.asBoolean();
         if (skyLightChanged) {
             resendSkyLight();
             var oldData = skyLightBaked.oldData().data();
@@ -328,7 +346,7 @@ public class ParallelLightSection implements LightSection<ParallelLightSection, 
             if (LightCompute.hasBorderChanged(oldData, newData, BlockFace.BOTTOM)) scheduleSkyRelight(down, depth);
             var neighborSnapshot = chunkData.createNeighborSnapshot();
             if (LightCompute.hasBorderChanged(oldData, newData, BlockFace.EAST))
-                scheduleNeighborSkyRelight(neighborSnapshot.get(net.minestom.server.instance.light.Neighbors.EAST), depth);
+                scheduleNeighborSkyRelight(neighborSnapshot.get(Neighbors.EAST), depth);
             if (LightCompute.hasBorderChanged(oldData, newData, BlockFace.NORTH))
                 scheduleNeighborSkyRelight(neighborSnapshot.get(Neighbors.NORTH), depth);
             if (LightCompute.hasBorderChanged(oldData, newData, BlockFace.SOUTH))
@@ -339,11 +357,17 @@ public class ParallelLightSection implements LightSection<ParallelLightSection, 
     }
 
     void relightExternalBlockLightAsync(int depth) {
-        runAsync(chunkData.trackerBlockLightExternal, sectionY, () -> relightExternalBlockLight(depth));
+        runAsync(chunkData.trackerBlockLightExternal, sectionY, () -> relightExternalBlockLight(depth)).exceptionally(t -> {
+            MinecraftServer.getExceptionManager().handleException(t);
+            return null;
+        });
     }
 
     void relightExternalSkyLightAsync(int depth) {
-        runAsync(chunkData.trackerSkyLightExternal, sectionY, () -> relightExternalSkyLight(depth));
+        runAsync(chunkData.trackerSkyLightExternal, sectionY, () -> relightExternalSkyLight(depth)).exceptionally(t -> {
+            MinecraftServer.getExceptionManager().handleException(t);
+            return null;
+        });
     }
 
     private void relightExternalBlockLight(int depth) {
@@ -359,16 +383,16 @@ public class ParallelLightSection implements LightSection<ParallelLightSection, 
     }
 
     private void fullSkyRelight() {
-        var modifiedInternal = skyLightSection.relightSkyLightInternal().asBoolean();
-        var modifiedExternal = skyLightSection.relightSkyLightExternal().asBoolean();
+        boolean modifiedInternal = skyLightSection.relightSkyLightInternal().asBoolean();
+        boolean modifiedExternal = skyLightSection.relightSkyLightExternal().asBoolean();
         if (modifiedInternal || modifiedExternal) {
             bakeAfterRelightAndPropagate(0);
         }
     }
 
     private void fullBlockRelight() {
-        var modifiedInternal = blockLightSection.relightBlockLightInternal().asBoolean();
-        var modifiedExternal = blockLightSection.relightBlockLightExternal().asBoolean();
+        boolean modifiedInternal = blockLightSection.relightBlockLightInternal().asBoolean();
+        boolean modifiedExternal = blockLightSection.relightBlockLightExternal().asBoolean();
         if (modifiedInternal || modifiedExternal) {
             bakeAfterRelightAndPropagate(0);
         }
@@ -384,12 +408,12 @@ public class ParallelLightSection implements LightSection<ParallelLightSection, 
         ((ParallelLightSection) neighbor.getLightSection(sectionY)).relightExternalSkyLightAsync(depth);
     }
 
-    private void scheduleBlockRelight(@Nullable ParallelLightSection section, int depth) {
+    private static void scheduleBlockRelight(@Nullable ParallelLightSection section, int depth) {
         if (section == null) return;
         section.relightExternalBlockLightAsync(depth);
     }
 
-    private void scheduleSkyRelight(@Nullable ParallelLightSection section, int depth) {
+    private static void scheduleSkyRelight(@Nullable ParallelLightSection section, int depth) {
         if (section == null) return;
         section.relightExternalSkyLightAsync(depth);
     }
@@ -422,7 +446,7 @@ public class ParallelLightSection implements LightSection<ParallelLightSection, 
     }
 
     @ApiStatus.Internal
-    public static void generatorRelightBlockLightExternalAndBakeSync(Collection<? extends LightSection> sections) {
+    public static void generatorRelightBlockLightExternalAndBakeSync(Collection<? extends LightSection<?, ?, ?>> sections) {
         var modified = new ArrayList<>(sections.stream().map(s -> (ParallelLightSection) s).toList());
         for (var section : modified) {
             // We need to bake once in the beginning to be able to relight external block light
@@ -475,8 +499,8 @@ public class ParallelLightSection implements LightSection<ParallelLightSection, 
         return bakeLight(skyLightInternal, skyLightExternal, skyLight, skyLightVersion);
     }
 
-    private LightUpdateResult<byte[]> bakeLight(AtomicReference<LightData<byte[]>> input1, AtomicReference<LightData<byte[]>> input2, AtomicReference<LightData<byte[]>> output, AtomicInteger version) {
-        var v = getNextVersion(version);
+    private static LightUpdateResult<byte[]> bakeLight(AtomicReference<LightData<byte[]>> input1, AtomicReference<LightData<byte[]>> input2, AtomicReference<LightData<byte[]>> output, AtomicInteger version) {
+        int v = getNextVersion(version);
         var l1 = input1.get();
         var l2 = input2.get();
         var data = LightCompute.bake(l1.data(), l2.data());
@@ -518,10 +542,10 @@ public class ParallelLightSection implements LightSection<ParallelLightSection, 
      *
      * @return if the value was changed. The value not changing means that the provided newData is old and should be discarded.
      */
-    private <T> LightUpdateResult<T> updateLightData(AtomicReference<LightData<T>> reference, LightData<T> newData, EqualityTester<T> equalityTester) {
+    private static <T> LightUpdateResult<T> updateLightData(AtomicReference<LightData<T>> reference, LightData<T> newData, EqualityTester<T> equalityTester) {
         while (true) {
             var currentData = reference.get();
-            var currentVersion = currentData.version;
+            int currentVersion = currentData.version;
             if (currentVersion > newData.version) {
                 // Old version, discard
                 return new LightUpdateResult<>(LightUpdateResultType.NEWER_VERSION_AVAILABLE, currentData);
@@ -529,7 +553,7 @@ public class ParallelLightSection implements LightSection<ParallelLightSection, 
             if (reference.compareAndSet(currentData, newData)) {
                 // Newer version, update via CAS
                 // Return whether the value actually changed. It may simply have been a version bump
-                var isEqual = equalityTester.equals(currentData.data(), newData.data());
+                boolean isEqual = equalityTester.equals(currentData.data(), newData.data());
                 if (isEqual) {
                     return new LightUpdateResult<>(LightUpdateResultType.WAS_EQUAL_UPDATED_VERSION, currentData);
                 } else {

@@ -50,6 +50,7 @@ public class PlayerPositionListener {
         player.refreshReceivedTeleportId(packet.teleportId());
     }
 
+    @SuppressWarnings("deprecation")
     private static void processMovement(Player player, Pos packetPosition, boolean onGround) {
         // Prevent the player from moving too far
         // Doubles close to max size can cause overflow, or simply have precision issues
@@ -78,7 +79,7 @@ public class PlayerPositionListener {
         // Try to move in an unloaded chunk, prevent it
         if (!currentPosition.sameChunk(packetPosition) && (!ChunkUtils.isLoaded(instance, packetPosition)
                 // Prevent falling through the world
-                || (!player.getChunkQueue().playerSeesChunk(packetPosition.chunkX(), packetPosition.chunkZ()))
+                || !player.getChunkQueue().playerSeesChunk(packetPosition.chunkX(), packetPosition.chunkZ())
         )) {
             System.err.println("Deny move from " + currentPosition + " to " + packetPosition);
             var _ = player.teleport(currentPosition);

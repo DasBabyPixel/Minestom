@@ -26,6 +26,8 @@ class ManagerSignaling {
     }
 
     /**
+     * Waits for a signal
+     *
      * @return true if a problem occurred
      */
     public boolean waitForSignal() {
@@ -37,7 +39,9 @@ class ManagerSignaling {
             if (this.signaled) return false;
             try {
                 // TODO we could also use awaitUninterruptibly, but should we?
-                this.hasSignalled.await();
+                while (!signaled) {
+                    this.hasSignalled.await();
+                }
             } catch (InterruptedException e) {
                 MinecraftServer.getExceptionManager().handleException(new ChunkSystemException("Unexpected interrupt. Someone is meddling with the ChunkClaimManager, this is not allowed!", e));
                 return true;

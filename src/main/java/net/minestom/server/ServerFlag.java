@@ -97,6 +97,7 @@ public final class ServerFlag {
      * Only fiddle with this if you must, for example, because you want to add a test using async logic.
      * In most cases, this should be left with the default
      */
+    @SuppressWarnings("ConstantField")
     public static boolean ASYNC_CHUNK_SYSTEM = booleanProperty("minestom.async-chunk-system", !INSIDE_TEST);
 
     private ServerFlag() {}

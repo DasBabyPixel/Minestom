@@ -19,7 +19,13 @@ import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nullable;
 
 import java.lang.ref.WeakReference;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.BitSet;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
@@ -34,6 +40,7 @@ import static net.minestom.server.coordinate.CoordConversion.globalToSectionRela
 public class LightingChunk extends DynamicChunk {
     private static final LightEngine LIGHT_ENGINE = LightEngine.getDefault();
     // A reusable WeakReference to reduce allocations.
+    @SuppressWarnings("this-escape")
     private final WeakReference<@Nullable LightingChunk> selfReference = new WeakReference<>(this);
     private final int minLightSection;
     private final int maxLightSection;
@@ -53,9 +60,9 @@ public class LightingChunk extends DynamicChunk {
         if (block == Block.AIR || block == null) return false;
         if (DIFFUSE_SKY_LIGHT.contains(block.key())) return true;
 
-        Shape shape = block.registry().occlusionShape();
-        boolean occludesTop = Block.AIR.registry().occlusionShape().isOccluded(shape, BlockFace.TOP);
-        boolean occludesBottom = Block.AIR.registry().occlusionShape().isOccluded(shape, BlockFace.BOTTOM);
+        Shape shape = block.occlusionShape();
+        boolean occludesTop = Block.AIR.occlusionShape().isOccluded(shape, BlockFace.TOP);
+        boolean occludesBottom = Block.AIR.occlusionShape().isOccluded(shape, BlockFace.BOTTOM);
 
         return occludesBottom || occludesTop;
     }
@@ -65,7 +72,7 @@ public class LightingChunk extends DynamicChunk {
         private final ChunkData chunkData;
         private final List<LSection> lightSections;
 
-        public Typed(LightingChunk chunk, Type type) {
+        Typed(LightingChunk chunk, Type type) {
             this.type = type;
             this.chunkData = type.newChunkData(chunk);
             this.lightSections = initSections(chunk);
@@ -76,17 +83,17 @@ public class LightingChunk extends DynamicChunk {
         }
 
         private List<LSection> initSections(LightingChunk chunk) {
-            var sectionsCount = chunk.maxLightSection - chunk.minLightSection;
+            int sectionsCount = chunk.maxLightSection - chunk.minLightSection;
             var sectionsTemp = new ArrayList<LSection>(sectionsCount);
-            for (var i = 0; i < sectionsCount; i++) {
-                var first = i == 0;
-                var last = i == sectionsCount - 1;
-                var section = first | last ? null : chunk.getSection(i + chunk.minLightSection);
+            for (int i = 0; i < sectionsCount; i++) {
+                boolean first = i == 0;
+                boolean last = i == sectionsCount - 1;
+                var section = first || last ? null : chunk.getSection(i + chunk.minLightSection);
                 sectionsTemp.add(type.newSection(chunkData, section, i + chunk.minLightSection));
             }
             LSection below = null;
             LSection self = null;
-            for (var i = 0; i < sectionsCount; i++) {
+            for (int i = 0; i < sectionsCount; i++) {
                 var above = sectionsTemp.get(i);
 
                 if (self != null) {
@@ -122,10 +129,12 @@ public class LightingChunk extends DynamicChunk {
         this.typed = typed.apply(this);
     }
 
+    @SuppressWarnings("this-escape")
     public LightingChunk(Instance instance, int chunkX, int chunkZ) {
         this(instance, chunkX, chunkZ, c -> new Typed<>(c, SnapshotLightSectionType.TYPE));
     }
 
+    @SuppressWarnings("this-escape")
     private LightingChunk(Instance instance, int chunkX, int chunkZ, Function<LightingChunk, Typed<?, ?, ?>> typed) {
         super(instance, chunkX, chunkZ);
         this.minLightSection = minSection - 1;
@@ -197,12 +206,12 @@ public class LightingChunk extends DynamicChunk {
         assertWriteLock();
         super.setBlock(x, y, z, block, placement, destroy);
         occlusionMap = null;
-        var sectionY = CoordConversion.globalToSection(y);
+        int sectionY = CoordConversion.globalToSection(y);
 
         var section = getLightSection(sectionY);
-        var relativeX = globalToSectionRelative(x);
-        var relativeY = globalToSectionRelative(y);
-        var relativeZ = globalToSectionRelative(z);
+        int relativeX = globalToSectionRelative(x);
+        int relativeY = globalToSectionRelative(y);
+        int relativeZ = globalToSectionRelative(z);
         section.blockChanged(relativeX, relativeY, relativeZ);
     }
 
@@ -259,7 +268,7 @@ public class LightingChunk extends DynamicChunk {
     protected LightData createPartialLightData(BitSet targetBlockSections, BitSet targetSkySections) {
         var builder = new LightDataBuilder(this);
 
-        for (var i = 0; i < typed.lightSections.size(); i++) {
+        for (int i = 0; i < typed.lightSections.size(); i++) {
             var section = typed.lightSections.get(i);
             builder.beginSection();
             if (targetBlockSections.get(i)) {
@@ -359,7 +368,7 @@ public class LightingChunk extends DynamicChunk {
 
         // This must be done here, because the supplier in CachedPacket may be evaluated multiple times,
         // and the AtomicBooleans would not be true the second time.
-        for (var i = 0; i < typed.lightSections.size(); i++) {
+        for (int i = 0; i < typed.lightSections.size(); i++) {
             var section = typed.lightSections.get(i);
             if (section.getAndResetResendBlockLight()) {
                 targetBlockSections.set(i);
@@ -388,10 +397,10 @@ public class LightingChunk extends DynamicChunk {
 
     @Override
     public int getBlockLight(int blockX, int blockY, int blockZ) {
-        var sectionY = CoordConversion.globalToSection(blockY);
-        var relX = globalToSectionRelative(blockX);
-        var relY = globalToSectionRelative(blockY);
-        var relZ = globalToSectionRelative(blockZ);
+        int sectionY = CoordConversion.globalToSection(blockY);
+        int relX = globalToSectionRelative(blockX);
+        int relY = globalToSectionRelative(blockY);
+        int relZ = globalToSectionRelative(blockZ);
         var section = getLightSection(sectionY);
         awaitLight();
         return section.getBlockLight(relX, relY, relZ);
@@ -399,10 +408,10 @@ public class LightingChunk extends DynamicChunk {
 
     @Override
     public int getSkyLight(int blockX, int blockY, int blockZ) {
-        var sectionY = CoordConversion.globalToSection(blockY);
-        var relX = globalToSectionRelative(blockX);
-        var relY = globalToSectionRelative(blockY);
-        var relZ = globalToSectionRelative(blockZ);
+        int sectionY = CoordConversion.globalToSection(blockY);
+        int relX = globalToSectionRelative(blockX);
+        int relY = globalToSectionRelative(blockY);
+        int relZ = globalToSectionRelative(blockZ);
         var section = getLightSection(sectionY);
         awaitLight();
         return section.getSkyLight(relX, relY, relZ);

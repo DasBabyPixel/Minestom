@@ -74,23 +74,23 @@ public sealed interface ChunkClaim permits ChunkClaimImpl {
     @FunctionalInterface
     interface Shape {
         Shape CIRCLE = (int radiusX, int radiusZ, int x, int z, int ox, int oz) -> {
-            var radiusSqX = radiusX * radiusX;
-            var radiusSqZ = radiusZ * radiusZ;
-            var dx = x - ox;
-            var dz = z - oz;
-            var dxSq = dx * dx;
-            var dzSq = dz * dz;
+            int radiusSqX = radiusX * radiusX;
+            int radiusSqZ = radiusZ * radiusZ;
+            int dx = x - ox;
+            int dz = z - oz;
+            int dxSq = dx * dx;
+            int dzSq = dz * dz;
             return (float) dxSq / radiusSqX + (float) dzSq / radiusSqZ <= 1;
         };
         Shape SQUARE = (int radiusX, int radiusZ, int x, int z, int ox, int oz) -> {
-            var dx = Math.abs(x - ox);
-            var dz = Math.abs(z - oz);
+            int dx = Math.abs(x - ox);
+            int dz = Math.abs(z - oz);
             return dx <= radiusX && dz <= radiusZ;
         };
         Shape DIAMOND = (int radiusX, int radiusZ, int x, int z, int ox, int oz) -> {
-            var dx = (float) Math.abs(x - ox);
-            var dz = (float) Math.abs(z - oz);
-            var d = dx / radiusX + dz / radiusZ;
+            float dx = (float) Math.abs(x - ox);
+            float dz = (float) Math.abs(z - oz);
+            float d = dx / radiusX + dz / radiusZ;
             return d <= 1F;
         };
 

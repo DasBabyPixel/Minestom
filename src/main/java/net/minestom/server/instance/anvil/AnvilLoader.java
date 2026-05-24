@@ -21,7 +21,6 @@ import net.minestom.server.instance.Instance;
 import net.minestom.server.instance.Section;
 import net.minestom.server.instance.block.Block;
 import net.minestom.server.instance.block.BlockHandler;
-import net.minestom.server.instance.light.LightCompute;
 import net.minestom.server.instance.palette.Palettes;
 import net.minestom.server.registry.DynamicRegistry;
 import net.minestom.server.registry.RegistryKey;
@@ -84,6 +83,7 @@ public class AnvilLoader implements ChunkLoader {
         this.path = path;
         this.levelPath = path.resolve("level.dat");
         this.regionPath = path.resolve("dimensions").resolve(dimension.namespace()).resolve(dimension.value()).resolve("region");
+        this.callbacks = AnvilCallbacks.noop();
     }
 
     /**
@@ -216,7 +216,7 @@ public class AnvilLoader implements ChunkLoader {
         }
     }
 
-    private static void loadSections(Chunk chunk, CompoundBinaryTag chunkData) {
+    private void loadSections(Chunk chunk, CompoundBinaryTag chunkData) {
         for (BinaryTag sectionTag : chunkData.getList("sections", BinaryTagTypes.COMPOUND)) {
             if (!(sectionTag instanceof CompoundBinaryTag sectionData)) {
                 LOGGER.warn("Invalid section tag in chunk data: {}", sectionTag);
@@ -424,7 +424,7 @@ public class AnvilLoader implements ChunkLoader {
         }
     }
 
-    private static void saveSectionData(Chunk chunk, CompoundBinaryTag.Builder chunkData) {
+    private void saveSectionData(Chunk chunk, CompoundBinaryTag.Builder chunkData) {
         final DynamicRegistry<Biome> biomeRegistry = chunk.getInstance().registries().biome();
         final ListBinaryTag.Builder<CompoundBinaryTag> sections = ListBinaryTag.builder(BinaryTagTypes.COMPOUND);
         final ListBinaryTag.Builder<CompoundBinaryTag> blockEntities = ListBinaryTag.builder(BinaryTagTypes.COMPOUND);

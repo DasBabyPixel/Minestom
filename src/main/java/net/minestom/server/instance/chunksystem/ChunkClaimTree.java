@@ -6,7 +6,13 @@ import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.UnknownNullability;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.Iterator;
+import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.Spliterators;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
@@ -97,22 +103,22 @@ public class ChunkClaimTree {
         this.tree.searchNodes(xCache, x);
         try {
             for (var nodeTreeX : xCache) {
-                var minX = nodeTreeX.start;
+                int minX = nodeTreeX.start;
                 for (var treeXEntry : nodeTreeX.end.int2ObjectEntrySet()) {
-                    var maxX = treeXEntry.getIntKey();
-                    var widthX = maxX - minX;
-                    var radiusX = widthX / 2;
-                    var centerX = minX + radiusX;
+                    int maxX = treeXEntry.getIntKey();
+                    int widthX = maxX - minX;
+                    int radiusX = widthX / 2;
+                    int centerX = minX + radiusX;
                     var treeZ = treeXEntry.getValue();
                     treeZ.searchNodes(zCache, z);
                     try {
                         for (var nodeTreeZ : zCache) {
-                            var minZ = nodeTreeZ.start;
+                            int minZ = nodeTreeZ.start;
                             for (var treeZEntry : nodeTreeZ.end.int2ObjectEntrySet()) {
-                                var maxZ = treeZEntry.getIntKey();
-                                var widthZ = maxZ - minZ;
-                                var radiusZ = widthZ / 2;
-                                var centerZ = minZ + radiusX;
+                                int maxZ = treeZEntry.getIntKey();
+                                int widthZ = maxZ - minZ;
+                                int radiusZ = widthZ / 2;
+                                int centerZ = minZ + radiusX;
                                 var entries = treeZEntry.getValue();
                                 for (var entry : entries) {
                                     var shape = entry.shape();
@@ -212,10 +218,10 @@ public class ChunkClaimTree {
         }
 
         private static class It implements Iterator<Entry> {
-            private final Iterator<ArrayList<Entry>> it;
+            private final Iterator<? extends List<Entry>> it;
             private @Nullable Iterator<Entry> it2 = null;
 
-            public It(Iterator<ArrayList<Entry>> it) {
+            private It(Iterator<? extends List<Entry>> it) {
                 this.it = it;
             }
 

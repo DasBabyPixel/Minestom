@@ -78,7 +78,7 @@ class UpdateQueue {
      * @return whether an element has been enqueued since last call to resetUpdate
      */
     boolean resetUpdated() {
-        var updated = this.updated;
+        boolean updated = this.updated;
         this.updated = false;
         return updated;
     }
@@ -88,7 +88,7 @@ class UpdateQueue {
         var tree = this.singleThreadedManager.tree;
         var priorityDrop = this.singleThreadedManager.priorityDrop;
 
-        var priority = tree.calculatePriority(priorityDrop, origin.priority(), origin.chunkX(), origin.chunkZ(), x, z);
+        double priority = tree.calculatePriority(priorityDrop, origin.priority(), origin.chunkX(), origin.chunkZ(), x, z);
         this.enqueue(new PrioritizedUpdate(updateType, priority, x, z, origin), claimData);
     }
 
@@ -108,7 +108,7 @@ class UpdateQueue {
 
         var tree = this.singleThreadedManager.tree;
         // We need an entry with the given priority at the chunk
-        var requiredPriority = tree.calculatePriority(priorityDrop, origin.priority(), origin.chunkX(), origin.chunkZ(), x, z);
+        double requiredPriority = tree.calculatePriority(priorityDrop, origin.priority(), origin.chunkX(), origin.chunkZ(), x, z);
         return requiredPriority + Vec.EPSILON < fromUpdatePriority;
     }
 
@@ -118,11 +118,11 @@ class UpdateQueue {
     }
 
     private void propagateUpdates(PrioritizedUpdate originUpdate, @Nullable SingleThreadedManager.ClaimData claimData) {
-        var x = originUpdate.x();
-        var z = originUpdate.z();
+        int x = originUpdate.x();
+        int z = originUpdate.z();
         var origin = originUpdate.origin();
         var updateType = originUpdate.updateType().propagated();
-        var originUpdatePriority = originUpdate.priority();
+        double originUpdatePriority = originUpdate.priority();
         this.propagateUpdate(origin, claimData, originUpdatePriority, x + 1, z + 1, updateType);
         this.propagateUpdate(origin, claimData, originUpdatePriority, x + 1, z, updateType);
         this.propagateUpdate(origin, claimData, originUpdatePriority, x + 1, z - 1, updateType);
@@ -138,5 +138,6 @@ class UpdateQueue {
      * Should help with memory consumption, in case that becomes an issue
      */
     private void cleanupUpdateQueue() {
+        assert this.hashCode() != 0; // Dummy assertion to allow compilation
     }
 }

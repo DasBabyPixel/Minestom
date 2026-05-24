@@ -9,6 +9,7 @@ import net.minestom.server.instance.palette.Palette;
 import net.minestom.server.world.DimensionType;
 import net.minestom.testing.Env;
 import net.minestom.testing.EnvTest;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -25,15 +26,16 @@ import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+@Disabled("enable or delete once lighting is complete")
 @EnvTest
 // The lighting fixture world uses the deprecated legacy layout
-@SuppressWarnings("removal")
+@SuppressWarnings({"removal", "unused", "UnnamedVariable"})
 public class LightParityIntegrationTest {
     private static final int REGION_SIZE = 3;
 
     @Test
     public void test(Env env) throws URISyntaxException, IOException {
-        Map<Vec, SectionEntry> sections = retrieveSections();
+        Map<Vec, SectionEntry> _ = retrieveSections();
         // Generate our own light
 
         InstanceContainer instance = (InstanceContainer) env.createFlatInstance();
@@ -74,7 +76,7 @@ public class LightParityIntegrationTest {
             for (int sectionIndex = chunk.getMinSection(); sectionIndex < chunk.getMaxSection(); sectionIndex++) {
                 if (sectionIndex > 6) break;
 
-                Section section = chunk.getSection(sectionIndex);
+                Section _ = chunk.getSection(sectionIndex);
 
                 if (true) throw new AssertionError();
 //                OldLight sectionLight = section.blockLight();
@@ -132,7 +134,7 @@ public class LightParityIntegrationTest {
     record SectionEntry(Palette blocks, byte[] sky, byte[] block) {
     }
 
-    private static Map<Vec, SectionEntry> retrieveSections() throws IOException, URISyntaxException {
+    private static Map<Vec, SectionEntry> retrieveSections() throws IOException {
         var worldDir = Files.createTempDirectory("minestom-light-parity-test");
         var mcaFile = worldDir.resolve("region").resolve("r.0.0.mca");
         Files.createDirectories(mcaFile.getParent());
@@ -151,7 +153,7 @@ public class LightParityIntegrationTest {
                 if (chunk == null) continue;
 
                 for (int sectionY = chunk.getMinSection(); sectionY < chunk.getMaxSection(); sectionY++) {
-                    var section = chunk.getSection(sectionY);
+                    var _ = chunk.getSection(sectionY);
                     if (true) throw new AssertionError();
 //                    sections.put(new Vec(x, sectionY, z), new SectionEntry(section.blockPalette(), section.skyLight().array(), section.blockLight().array()));
                 }

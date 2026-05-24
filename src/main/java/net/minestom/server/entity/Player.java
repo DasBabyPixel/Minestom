@@ -28,8 +28,6 @@ import net.minestom.server.adventure.audience.Audiences;
 import net.minestom.server.collision.BoundingBox;
 import net.minestom.server.command.CommandSender;
 import net.minestom.server.component.DataComponents;
-import net.minestom.server.coordinate.ChunkRange;
-import net.minestom.server.coordinate.CoordConversion;
 import net.minestom.server.coordinate.Point;
 import net.minestom.server.coordinate.Pos;
 import net.minestom.server.coordinate.Vec;
@@ -43,8 +41,6 @@ import net.minestom.server.event.inventory.InventoryOpenEvent;
 import net.minestom.server.event.item.ItemDropEvent;
 import net.minestom.server.event.item.PickupExperienceEvent;
 import net.minestom.server.event.item.PlayerFinishItemUseEvent;
-import net.minestom.server.event.player.PlayerChunkLoadEvent;
-import net.minestom.server.event.player.PlayerChunkUnloadEvent;
 import net.minestom.server.event.player.PlayerDeathEvent;
 import net.minestom.server.event.player.PlayerDisconnectEvent;
 import net.minestom.server.event.player.PlayerGameModeChangeEvent;
@@ -87,8 +83,6 @@ import net.minestom.server.network.packet.server.common.ShowDialogPacket;
 import net.minestom.server.network.packet.server.play.ActionBarPacket;
 import net.minestom.server.network.packet.server.play.CameraPacket;
 import net.minestom.server.network.packet.server.play.ChangeGameStatePacket;
-import net.minestom.server.network.packet.server.play.ChunkBatchFinishedPacket;
-import net.minestom.server.network.packet.server.play.ChunkBatchStartPacket;
 import net.minestom.server.network.packet.server.play.ClearTitlesPacket;
 import net.minestom.server.network.packet.server.play.DeathCombatEventPacket;
 import net.minestom.server.network.packet.server.play.DestroyEntitiesPacket;
@@ -108,7 +102,6 @@ import net.minestom.server.network.packet.server.play.ServerDifficultyPacket;
 import net.minestom.server.network.packet.server.play.SetExperiencePacket;
 import net.minestom.server.network.packet.server.play.SetSlotPacket;
 import net.minestom.server.network.packet.server.play.SpawnPositionPacket;
-import net.minestom.server.network.packet.server.play.UnloadChunkPacket;
 import net.minestom.server.network.packet.server.play.UpdateHealthPacket;
 import net.minestom.server.network.packet.server.play.UpdateViewPositionPacket;
 import net.minestom.server.network.packet.server.play.WorldEventPacket;
@@ -149,7 +142,6 @@ import org.jetbrains.annotations.Nullable;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -647,8 +639,8 @@ public class Player extends LivingEntity implements CommandSender, HoverEventSou
      * @return a future called once the player instance changed
      */
     @Override
-    public CompletableFuture<Void> setInstance(Instance instance, Pos spawnPosition) {
-        var start = System.nanoTime();
+    public CompletableFuture<@Nullable Void> setInstance(Instance instance, Pos spawnPosition) {
+        long start = System.nanoTime();
         final @Nullable Instance currentInstance = this.instance;
         Check.argCondition(currentInstance == instance, "Instance should be different than the current one");
 
@@ -679,7 +671,10 @@ public class Player extends LivingEntity implements CommandSender, HoverEventSou
             }
         });
 
-        future3x3.thenRun(() -> instance.getChunkManager().removeClaim(temporaryClaim.claim()));
+        future3x3.thenCompose(_ -> instance.getChunkManager().removeClaim(temporaryClaim.claim())).exceptionally(t -> {
+            MinecraftServer.getExceptionManager().handleException(t);
+            return null;
+        });
 
         if (future3x3.isDone()) {
             // Relevant chunks are already loaded
@@ -691,7 +686,7 @@ public class Player extends LivingEntity implements CommandSender, HoverEventSou
         final Thread runThread = Thread.currentThread();
         CountDownLatch latch = new CountDownLatch(1);
         Scheduler scheduler = MinecraftServer.getSchedulerManager();
-        CompletableFuture<Void> future = new CompletableFuture<>() {
+        CompletableFuture<@Nullable Void> future = new CompletableFuture<>() {
             @Override
             public Void join() {
                 // Prevent deadlock
@@ -709,8 +704,8 @@ public class Player extends LivingEntity implements CommandSender, HoverEventSou
         };
 
         // TODO remove following debug print
-        future.thenRun(() -> {
-            var time = System.nanoTime() - start;
+        var _ = future.thenRun(() -> {
+            long time = System.nanoTime() - start;
             System.out.println("Joining took: " + java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(time) + "ms");
         });
 
@@ -720,6 +715,9 @@ public class Player extends LivingEntity implements CommandSender, HoverEventSou
                 future.complete(null);
             });
             latch.countDown();
+        }).exceptionally(t -> {
+            MinecraftServer.getExceptionManager().handleException(t);
+            return null;
         });
         return future;
     }
@@ -734,7 +732,7 @@ public class Player extends LivingEntity implements CommandSender, HoverEventSou
      * @see #setInstance(Instance, Pos)
      */
     @Override
-    public CompletableFuture<Void> setInstance(Instance instance) {
+    public CompletableFuture<@Nullable Void> setInstance(Instance instance) {
         return setInstance(instance, this.instance != null ? getPosition() : getRespawnPoint());
     }
 
@@ -776,11 +774,12 @@ public class Player extends LivingEntity implements CommandSender, HoverEventSou
             final int chunkZ = spawnPosition.chunkZ();
             // sends all unloads/loads for the chunks
             if (!firstSpawn) {
-                chunkTracker.stopTracking();
+                chunkTracker.updateInstanceDifferentChunks(newTracked, dimensionChange);
+            } else {
+                chunkTracker.startTracking(newTracked);
             }
-            chunkTracker.startTracking(newTracked);
 
-            chunkUpdateLimitChecker.addToHistory(getChunk());
+            chunkUpdateLimitChecker.addToHistory(newTracked.chunkAndClaim().chunkFuture().join());
             sendPacket(new UpdateViewPositionPacket(chunkX, chunkZ));
 
             sendPendingChunks(); // Send available first chunk immediately to prevent falling through the floor
@@ -2442,7 +2441,14 @@ public class Player extends LivingEntity implements CommandSender, HoverEventSou
         return effectiveViewDistance(instance);
     }
 
-    private int effectiveViewDistance(@Nullable Instance instance) {
+    /**
+     * Gets the client's 'effective' view distance, which is the minimum of the client's view distance settings, and the local instance settings, plus one
+     *
+     * @param instance the target instance
+     * @return The effective chunk view distance range of the client
+     */
+    @ApiStatus.Internal
+    public int effectiveViewDistance(@Nullable Instance instance) {
         int maxViewDistance = instance != null ? instance.viewDistance() : ServerFlag.CHUNK_VIEW_DISTANCE;
         return Math.min(settings.viewDistance(), maxViewDistance) + 1;
     }

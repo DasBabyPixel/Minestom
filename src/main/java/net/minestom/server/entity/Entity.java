@@ -444,7 +444,12 @@ public class Entity implements Viewable, Tickable, Schedulable, Snapshotable, Ev
             var claim = instance.getChunkManager().addClaim(globalPosition);
             return claim.chunkFuture().thenRun(endCallback).thenRun(() -> {
                 // Remove the claim after 10 ticks. This will help many tests pass, and shouldn't impact normal usage
-                instance.scheduler().scheduleTask(() -> instance.getChunkManager().removeClaim(claim.claim()), TaskSchedule.tick(10), TaskSchedule.stop());
+                instance
+                        .scheduler()
+                        .scheduleTask(() -> instance.getChunkManager().removeClaim(claim.claim()).exceptionally(t -> {
+                            MinecraftServer.getExceptionManager().handleException(t);
+                            return null;
+                        }), TaskSchedule.tick(10), TaskSchedule.stop());
             });
         } else {
             // Position is in the same chunk, keep it sync
@@ -461,7 +466,10 @@ public class Entity implements Viewable, Tickable, Schedulable, Snapshotable, Ev
                 .thenRun(endCallback)
                 .thenRun(() -> {
                     // Remove the claim after 10 ticks. This will help many tests pass, and shouldn't impact normal usage
-                    instance.scheduler().scheduleTask(() -> instance.getChunkManager().removeClaim(chunkAndClaim.claim()), TaskSchedule.tick(10), TaskSchedule.stop());
+                    instance.scheduler().scheduleTask(() -> instance.getChunkManager().removeClaim(chunkAndClaim.claim()).exceptionally(t -> {
+                        MinecraftServer.getExceptionManager().handleException(t);
+                        return null;
+                    }), TaskSchedule.tick(10), TaskSchedule.stop());
                 });
     }
 
@@ -919,7 +927,7 @@ public class Entity implements Viewable, Tickable, Schedulable, Snapshotable, Ev
      * this is due to chunks needing to load. Can also complete exceptionally in case of cancelled events.
      * @throws IllegalStateException if {@code instance} has not been registered in {@link InstanceManager}
      */
-    public CompletableFuture<Void> setInstance(Instance instance, Pos spawnPosition) {
+    public CompletableFuture<@Nullable Void> setInstance(Instance instance, Pos spawnPosition) {
         Check.stateCondition(!instance.isRegistered(),
                 "Instances need to be registered, please use InstanceManager#registerInstance or InstanceManager#registerSharedInstance");
         final Instance previousInstance = this.instance;
@@ -963,7 +971,10 @@ public class Entity implements Viewable, Tickable, Schedulable, Snapshotable, Ev
 
                 instance.scheduler().scheduleTask(() -> {
                     // Remove the claim after 10 ticks. This will help many tests pass, and shouldn't impact normal usage
-                    instance.getChunkManager().removeClaim(chunkAndClaim.claim());
+                    instance.getChunkManager().removeClaim(chunkAndClaim.claim()).exceptionally(t -> {
+                        MinecraftServer.getExceptionManager().handleException(t);
+                        return null;
+                    });
                 }, TaskSchedule.tick(10), TaskSchedule.stop());
             } catch (Exception e) {
                 MinecraftServer.getExceptionManager().handleException(e);
@@ -971,7 +982,7 @@ public class Entity implements Viewable, Tickable, Schedulable, Snapshotable, Ev
         });
     }
 
-    public CompletableFuture<Void> setInstance(Instance instance, Point spawnPosition) {
+    public CompletableFuture<@Nullable Void> setInstance(Instance instance, Point spawnPosition) {
         return setInstance(instance, spawnPosition.asPos());
     }
 
@@ -984,7 +995,7 @@ public class Entity implements Viewable, Tickable, Schedulable, Snapshotable, Ev
      * @throws NullPointerException  if {@code instance} is null
      * @throws IllegalStateException if {@code instance} has not been registered in {@link InstanceManager}
      */
-    public CompletableFuture<Void> setInstance(Instance instance) {
+    public CompletableFuture<@Nullable Void> setInstance(Instance instance) {
         return setInstance(instance, this.position);
     }
 
@@ -1501,7 +1512,7 @@ public class Entity implements Viewable, Tickable, Schedulable, Snapshotable, Ev
         final int newChunkZ = newPosition.chunkZ();
         if (lastChunkX != newChunkX || lastChunkZ != newChunkZ) {
             // Entity moved in a new chunk
-            final Chunk newChunk = instance.getChunk(newChunkX, newChunkZ);
+            @SuppressWarnings("deprecation") final Chunk newChunk = instance.getChunk(newChunkX, newChunkZ);
             Check.notNull(newChunk, "The entity {0} tried to move in an unloaded chunk at {1}", getEntityId(), newPosition);
             if (this instanceof Player player) {
                 player.sendChunkUpdates(newChunk);

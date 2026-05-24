@@ -9,14 +9,18 @@ import net.minestom.server.instance.generator.Generator;
 import net.minestom.server.utils.chunk.ChunkSupplier;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nullable;
-import org.jetbrains.annotations.UnknownNullability;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.HashSet;
 import java.util.Set;
 import java.util.WeakHashMap;
-import java.util.concurrent.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinWorkerThread;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 
 @ApiStatus.Internal
@@ -27,8 +31,10 @@ public class ChunkWorker {
      * Use a common worker pool for all managers. A manager may only submit a task if he holds
      * a permit in {@link #AVAILABLE_TASKS}
      */
-    private static @UnknownNullability ExecutorService WORKER_EXECUTOR;
-    private static @UnknownNullability ExecutorService SAVE_EXECUTOR;
+    @SuppressWarnings("ConstantField")
+    private static @Nullable ExecutorService WORKER_EXECUTOR;
+    @SuppressWarnings("ConstantField")
+    private static @Nullable ExecutorService SAVE_EXECUTOR;
     /**
      * We allow twice the number of available processors to be submitted before waiting.
      * This is so we don't waste time.
@@ -67,31 +73,34 @@ public class ChunkWorker {
     }
 
     void workerGenerateChunk(int x, int z, ChunkLoader loader, ChunkSupplier supplier, @Nullable Generator generator) {
-        if (!loader.supportsParallelLoading()) {
-            // TODO maybe revisit and add locking to allow for non-parallel loaders, but not right now
-            synchronized (WARNED_LOADERS) {
-                if (!WARNED_LOADERS.containsKey(loader)) {
-                    LOGGER.error("ChunkLoaders must support parallel loading. Please migrate your system. Violating loader: {}", loader, new AssertionError());
-                    WARNED_LOADERS.put(loader, true);
+        try {
+            if (!loader.supportsParallelLoading()) {
+                // TODO maybe revisit and add locking to allow for non-parallel loaders, but not right now
+                synchronized (WARNED_LOADERS) {
+                    if (!WARNED_LOADERS.containsKey(loader)) {
+                        LOGGER.error("ChunkLoaders must support parallel loading. Please migrate your system. Violating loader: {}", loader, new AssertionError());
+                        WARNED_LOADERS.put(loader, true);
+                    }
                 }
             }
-        }
 
-        var chunk = loader.loadChunk(instance, x, z);
-        if (chunk == null) {
-            // Loader couldn't load the chunk from storage, generate it instead
-            chunk = this.chunkGenerationHandler.createChunk(supplier, generator, x, z);
-            chunk.onGenerate();
-        } else {
-            chunk.onLoadedFromStorage();
-        }
+            var chunk = loader.loadChunk(instance, x, z);
+            if (chunk == null) {
+                // Loader couldn't load the chunk from storage, generate it instead
+                chunk = this.chunkGenerationHandler.createChunk(supplier, generator, x, z);
+                chunk.onGenerate();
+            } else {
+                chunk.onLoadedFromStorage();
+            }
 
-        this.workerFinishedGeneration(chunk);
+            this.workerFinishedGeneration(chunk);
+        } catch (Throwable t) {
+            this.taskSchedulerThread.addTask(new TaskSchedulerThread.Task.ChunkGenerationFail(x, z, t));
+        }
     }
 
     void workerFinishedGeneration(Chunk chunk) {
         this.taskSchedulerThread.addTask(new TaskSchedulerThread.Task.ChunkGenerationFinished(chunk));
-        // TODO
     }
 
     /**
@@ -207,8 +216,8 @@ public class ChunkWorker {
         SAVE_EXECUTOR = createLowPriority(0.5);
     }
 
-    private static CompletableFuture<Void> shutdown(ExecutorService service, int timeoutSeconds) {
-        var fut = new CompletableFuture<Void>();
+    private static CompletableFuture<@Nullable Void> shutdown(ExecutorService service, int timeoutSeconds) {
+        var fut = new CompletableFuture<@Nullable Void>();
         service.shutdown();
         if (service.isTerminated()) {
             fut.complete(null);
@@ -231,8 +240,9 @@ public class ChunkWorker {
         return fut;
     }
 
+    @SuppressWarnings("ThreadPriorityCheck")
     static ForkJoinPool createLowPriority(double multiplier) {
-        var parallelism = Math.max(1, (int) (Runtime.getRuntime().availableProcessors() * multiplier));
+        int parallelism = Math.max(1, (int) (Runtime.getRuntime().availableProcessors() * multiplier));
         return new ForkJoinPool(parallelism, pool -> new ForkJoinWorkerThread(pool) {
             {
                 // Set the priority very low.

@@ -36,7 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 @EnvTest
 // Deliberately keeps coverage of the deprecated legacy world layout until its removal
-@SuppressWarnings("removal")
+@SuppressWarnings({"removal", "deprecation"})
 public class AnvilLoaderIntegrationTest {
     private static final Path WORLD_RESOURCES = Path.of("src", "test", "resources", "net", "minestom", "server", "instance");
 

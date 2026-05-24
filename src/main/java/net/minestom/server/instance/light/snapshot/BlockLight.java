@@ -30,7 +30,7 @@ class BlockLight {
         var queue = sources.queue();
         var blockPalettes = sources.blockPalettes();
         var light = LightCompute.compute3x3(blockPalettes, queue);
-        var changed = this.light.update(light, context.version());
+        boolean changed = this.light.update(light, context.version());
         if (changed) {
             section.scheduleResendBlock();
         }
@@ -57,15 +57,15 @@ class BlockLight {
         private int version = 0;
         private T data;
 
-        public UpdatableContent(T data) {
+        UpdatableContent(T data) {
             this.data = data;
         }
 
-        public synchronized T data() {
+        synchronized T data() {
             return data;
         }
 
-        public synchronized boolean update(T newData, int version) {
+        synchronized boolean update(T newData, int version) {
             if (version < this.version) return false;
             this.version = version;
             this.data = newData;
@@ -79,8 +79,8 @@ class BlockLight {
     private static void fill(Palette[] blockPalettes, IntArrayFIFOQueue queue, CalculationContext.@Nullable ChunkContext chunkContext) {
         if (chunkContext == null) return;
         var neighbor = chunkContext.neighbor();
-        var x = neighbor == null ? 0 : neighbor.x();
-        var z = neighbor == null ? 0 : neighbor.z();
+        int x = neighbor == null ? 0 : neighbor.x();
+        int z = neighbor == null ? 0 : neighbor.z();
         fill(blockPalettes, queue, x, -1, z, chunkContext.lower());
         fill(blockPalettes, queue, x, 0, z, chunkContext.middle());
         fill(blockPalettes, queue, x, 1, z, chunkContext.upper());
@@ -98,7 +98,7 @@ class BlockLight {
         if (singleValue != -1) {
             Block block = Block.fromStateId(singleValue);
             assert block != null;
-            int lightEmission = block.registry().lightEmission();
+            int lightEmission = block.lightEmission();
             if (lightEmission <= 0) return;
             final int prefix = sectionPos << 21 | sectionIdx << 16 | lightEmission << 12;
             for (int index = 0; index < SECTION_BLOCK_COUNT; index++) {
@@ -111,7 +111,7 @@ class BlockLight {
             blockPalette.getAllPresent((x, y, z, stateId) -> {
                 final Block block = Block.fromStateId(stateId);
                 assert block != null;
-                final int lightEmission = block.registry().lightEmission();
+                final int lightEmission = block.lightEmission();
                 if (lightEmission <= 0) return;
                 final int index = x | (z << 4) | (y << 8);
                 queue.enqueue(prefix | (lightEmission << 12) | index);

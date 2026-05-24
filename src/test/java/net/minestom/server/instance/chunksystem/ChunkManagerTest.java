@@ -12,7 +12,7 @@ class ChunkManagerTest {
     void testHigherRadiusSamePriority(Env env) {
         var instance = env.createFlatInstance();
         var manager = instance.getChunkManager();
-        for (var i = 0; i < 100; i++) {
+        for (int i = 0; i < 100; i++) {
             manager.addClaim(150, i, 0, 10, ChunkClaim.Shape.SQUARE);
         }
         manager.addClaim(140, 50, 30, 20, ChunkClaim.Shape.SQUARE);

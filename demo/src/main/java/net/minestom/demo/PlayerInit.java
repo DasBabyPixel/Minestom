@@ -100,14 +100,13 @@ import net.minestom.server.utils.time.TimeUnit;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.locks.LockSupport;
-import java.util.concurrent.locks.ReentrantLock;
 
 public class PlayerInit {
 
@@ -470,7 +469,7 @@ public class PlayerInit {
         instanceContainer.setGenerator(unit -> {
             unit.modifier().fillHeight(0, 40, Block.STONE);
 
-            var start = System.nanoTime();
+//            long _ = System.nanoTime();
 
 //             50 ms for every chunk
 //            while (System.nanoTime() - start < java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(50)) ;
@@ -489,7 +488,7 @@ public class PlayerInit {
 //        instance2.setGenerator(unit -> {
 //            var start = System.nanoTime();
 //
-////             50 ms for every chunk
+//             50 ms for every chunk
 //            while (System.nanoTime() - start < java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(50)) ;
 //            unit.modifier().fillHeight(0, 34, Block.STONE);
 //            unit.modifier().fillHeight(34, 39, Block.DIRT);
@@ -518,7 +517,7 @@ public class PlayerInit {
 
             long ramUsage = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
             ramUsage /= 1_000_000; // bytes to MB
-            var loadedChunks = MinecraftServer.getInstanceManager().getInstances().stream().map(Instance::getChunks).mapToInt(Collection::size).sum();
+            int loadedChunks = MinecraftServer.getInstanceManager().getInstances().stream().map(Instance::getChunks).mapToInt(Collection::size).sum();
 
             TickMonitor tickMonitor = LAST_TICK.get();
             final Component header = Component.text("RAM USAGE: " + ramUsage + " MB")

@@ -28,13 +28,10 @@ import net.minestom.server.utils.validate.Check;
 import net.minestom.server.world.DimensionType;
 import net.minestom.server.world.biome.Biome;
 import org.jetbrains.annotations.Nullable;
-import org.jetbrains.annotations.UnknownNullability;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.BitSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -319,7 +316,7 @@ public class DynamicChunk extends Chunk {
         var builder = new LightDataBuilder(this);
         // first section, below all block sections
         builder.beginSection().emptyBlock().emptySky().endSection();
-        for (var i = 0; i < sections.size(); i++) {
+        for (int i = 0; i < sections.size(); i++) {
             builder.beginSection().emptyBlock().emptySky().endSection();
         }
         // last section, above all block sections

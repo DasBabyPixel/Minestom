@@ -1,6 +1,10 @@
 package net.minestom.server.entity;
 
-import it.unimi.dsi.fastutil.longs.*;
+import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
+import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import it.unimi.dsi.fastutil.longs.LongSet;
+import net.minestom.server.MinecraftServer;
 import net.minestom.server.ServerFlag;
 import net.minestom.server.coordinate.CoordConversion;
 import net.minestom.server.coordinate.Point;
@@ -74,9 +78,9 @@ public class PlayerChunkTracker {
 
             // The simplest approach is to iterate through all chunks. Let's use that and see how well it does
             for (var it = chunksSentOrInQueue.longIterator(); it.hasNext(); ) {
-                var chunkIndex = it.nextLong();
-                var chunkX = CoordConversion.chunkIndexGetX(chunkIndex);
-                var chunkZ = CoordConversion.chunkIndexGetZ(chunkIndex);
+                long chunkIndex = it.nextLong();
+                int chunkX = CoordConversion.chunkIndexGetX(chunkIndex);
+                int chunkZ = CoordConversion.chunkIndexGetZ(chunkIndex);
                 if (tracked.chunkAndClaim().claim().contains(chunkX, chunkZ)) {
                     // Chunk is visible in the new claim
                     continue;
@@ -85,7 +89,7 @@ public class PlayerChunkTracker {
                 player.getChunkQueue().cancelSend(chunkX, chunkZ);
                 if (sendUnloads) {
                     // TODO there may be an argument to have an "unload queue"
-                    unloadChunk(chunkX, chunkZ);
+                    player.sendPacket(new UnloadChunkPacket(chunkX, chunkZ));
                 }
             }
 
@@ -100,6 +104,7 @@ public class PlayerChunkTracker {
      * Special method to update the instance of the tracked object, but don't send any chunk updates.
      * Used for shared instances
      */
+    @ApiStatus.Internal
     public void updateInstanceSameChunks(Tracked tracked) {
         lock.lock();
         try {
@@ -108,6 +113,52 @@ public class PlayerChunkTracker {
             }
             this.tracked.untrack();
             this.tracked = tracked;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /**
+     * Special method to update the instance of the tracked object.
+     */
+    @ApiStatus.Internal
+    public void updateInstanceDifferentChunks(Tracked tracked, boolean dimensionChange) {
+        lock.lock();
+        try {
+            if (this.tracked == null) {
+                throw new IllegalStateException("Tried to change tracking when nothing was being tracked. This is most likely a logic error.");
+            }
+
+            this.tracked.untrack();
+            var claim = tracked.chunkAndClaim.claim();
+
+            // Clear all chunks
+            var it = chunksSentOrInQueue.longIterator();
+            while (it.hasNext()) {
+                long chunkIndex = it.nextLong();
+                int chunkX = CoordConversion.chunkIndexGetX(chunkIndex);
+                int chunkZ = CoordConversion.chunkIndexGetZ(chunkIndex);
+                player.getChunkQueue().cancelSend(chunkX, chunkZ);
+
+                if (!dimensionChange) {
+                    // Only send UnloadChunkPacket for chunks no longer in the new view.
+                    // This alleviates a 26.2 client bug where, if it processes an UnloadChunkPacket
+                    // and a ChunkDataPacket for the same chunk in the same frame, the chunk disappears.
+                    // https://bugs.mojang.com/browse/MC/issues/MC-310041
+                    // TODO(26.3): Revert this change; the client bug is fixed in 26.3-snapshot5
+                    assert MinecraftServer.DATA_PACK_VERSION.major() < 112 : "Fixed in 26.3-snapshot5. Revert to always send chunk unload packet";
+
+                    if (claim.contains(chunkX, chunkZ)) {
+                        continue; // Skip unload packet
+                    }
+                }
+
+                player.sendPacket(new UnloadChunkPacket(chunkX, chunkZ));
+            }
+            chunksSentOrInQueue.clear();
+
+            this.tracked = tracked;
+            sendStale();
         } finally {
             lock.unlock();
         }
@@ -170,9 +221,9 @@ public class PlayerChunkTracker {
             }
 
             for (var it = chunksSentOrInQueue.longIterator(); it.hasNext(); ) {
-                var chunkIndex = it.nextLong();
-                var chunkX = CoordConversion.chunkIndexGetX(chunkIndex);
-                var chunkZ = CoordConversion.chunkIndexGetZ(chunkIndex);
+                long chunkIndex = it.nextLong();
+                int chunkX = CoordConversion.chunkIndexGetX(chunkIndex);
+                int chunkZ = CoordConversion.chunkIndexGetZ(chunkIndex);
                 player.getChunkQueue().cancelSend(chunkX, chunkZ);
             }
             chunksSentOrInQueue.clear();
@@ -218,11 +269,11 @@ public class PlayerChunkTracker {
             // Clear all chunks
             var it = chunksSentOrInQueue.longIterator();
             while (it.hasNext()) {
-                var chunkIndex = it.nextLong();
-                var chunkX = CoordConversion.chunkIndexGetX(chunkIndex);
-                var chunkZ = CoordConversion.chunkIndexGetZ(chunkIndex);
+                long chunkIndex = it.nextLong();
+                int chunkX = CoordConversion.chunkIndexGetX(chunkIndex);
+                int chunkZ = CoordConversion.chunkIndexGetZ(chunkIndex);
                 player.getChunkQueue().cancelSend(chunkX, chunkZ);
-                unloadChunk(chunkX, chunkZ);
+                player.sendPacket(new UnloadChunkPacket(chunkX, chunkZ));
             }
             chunksSentOrInQueue.clear();
         } finally {
@@ -230,10 +281,12 @@ public class PlayerChunkTracker {
         }
     }
 
-    private void unloadChunk(int x, int z) {
-        player.sendPacket(new UnloadChunkPacket(x, z));
-    }
-
+    /**
+     * Tries to send all visible chunks. This is useful after instance changes/changing claims.
+     * <p>
+     * After a claim change, the new claim may already have some chunks loaded immediately, and the chunkLoaded callback won't work for those chunks.
+     * This is able to resend all those missed chunks.
+     */
     private void sendStale() {
         assert tracked != null;
         for (var chunk : tracked.visibleChunks().values()) {
@@ -246,7 +299,7 @@ public class PlayerChunkTracker {
         return new ClaimCallbacks() {
             @Override
             public void chunkLoaded(ChunkClaim claim, Chunk chunk) {
-                var index = CoordConversion.chunkIndex(chunk.getChunkX(), chunk.getChunkZ());
+                long index = CoordConversion.chunkIndex(chunk.getChunkX(), chunk.getChunkZ());
                 lock.lock();
                 try {
                     trackedVisibleChunks.put(index, chunk);
@@ -263,11 +316,16 @@ public class PlayerChunkTracker {
         };
     }
 
+    /**
+     * Ensures the chunk is enqueued in the chunk queue. Does nothing if previously sent or enqueued.
+     *
+     * @param chunk the chunk to send
+     */
     private void sendChunk(Chunk chunk) {
-        var x = chunk.getChunkX();
-        var z = chunk.getChunkZ();
-        var index = CoordConversion.chunkIndex(x, z);
-        var sendChunk = chunksSentOrInQueue.add(index);
+        int x = chunk.getChunkX();
+        int z = chunk.getChunkZ();
+        long index = CoordConversion.chunkIndex(x, z);
+        boolean sendChunk = chunksSentOrInQueue.add(index);
         if (sendChunk) {
             player.sendChunk(chunk);
         }
@@ -288,16 +346,21 @@ public class PlayerChunkTracker {
     public Tracked addClaim(Instance instance, int chunkX, int chunkZ) {
         var chunkManager = instance.getChunkManager();
         var trackedVisibleChunks = new Long2ObjectOpenHashMap<Chunk>();
-        var chunkAndClaim = chunkManager.addClaim(chunkX, chunkZ, this.player.effectiveViewDistance(), this.priority, CLAIM_SHAPE, callbacks(trackedVisibleChunks));
+        var chunkAndClaim = chunkManager.addClaim(chunkX, chunkZ, this.player.effectiveViewDistance(instance), this.priority, CLAIM_SHAPE, callbacks(trackedVisibleChunks));
         return new Tracked(chunkManager, chunkAndClaim, trackedVisibleChunks);
     }
 
     /**
+     * Represents the tracked area
+     *
      * @param visibleChunks the chunks that should be visible to the player. These chunks may still be in the chunk (send) queue.
      */
     public record Tracked(ChunkManager chunkManager, ChunkAndClaim chunkAndClaim, Long2ObjectMap<Chunk> visibleChunks) {
         private void untrack() {
-            chunkManager.removeClaim(chunkAndClaim.claim());
+            chunkManager.removeClaim(chunkAndClaim.claim()).exceptionally(t -> {
+                MinecraftServer.getExceptionManager().handleException(t);
+                return null;
+            });
         }
     }
 }

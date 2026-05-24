@@ -13,13 +13,13 @@ import net.minestom.server.instance.generator.Generator;
 import net.minestom.server.instance.generator.GeneratorImpl;
 import net.minestom.server.instance.palette.Palette;
 import net.minestom.server.utils.chunk.ChunkSupplier;
-import net.minestom.server.utils.validate.Check;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 class ChunkGenerationHandler {
@@ -34,7 +34,7 @@ class ChunkGenerationHandler {
 
     public Chunk createChunk(ChunkSupplier chunkSupplier, @Nullable Generator generator, int chunkX, int chunkZ) {
         final Chunk chunk = chunkSupplier.createChunk(instance, chunkX, chunkZ);
-        Check.notNull(chunk, "Chunks supplied by a ChunkSupplier cannot be null.");
+        Objects.requireNonNull(chunk, "Chunks supplied by a ChunkSupplier cannot be null.");
         if (generator == null || !chunk.shouldGenerate()) {
             // No chunk generator, execute the callback with the empty chunk
             processFork(chunk);
@@ -105,7 +105,7 @@ class ChunkGenerationHandler {
         });
     }
 
-    private void applyFork(Chunk chunk, GeneratorImpl.SectionModifierImpl sectionModifier) {
+    private static void applyFork(Chunk chunk, GeneratorImpl.SectionModifierImpl sectionModifier) {
         chunk.lockWriteLock();
         try {
             Section section = chunk.getSectionAt(sectionModifier.start().blockY());
@@ -118,7 +118,7 @@ class ChunkGenerationHandler {
         }
     }
 
-    private void applyGenerationData(Chunk chunk, GeneratorImpl.SectionModifierImpl section) {
+    private static void applyGenerationData(Chunk chunk, GeneratorImpl.SectionModifierImpl section) {
         var cache = section.genSection().specials();
         if (cache.isEmpty()) return;
         final int height = section.start().blockY();

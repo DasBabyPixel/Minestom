@@ -14,13 +14,13 @@ public class SkyLightSection {
     }
 
     LightUpdateResult<byte[]> relightSkyLightInternal() {
-        var version = section.getNextSkyLightInternalVersion();
+        int version = section.getNextSkyLightInternalVersion();
         var lightData = prepareSkyLightInternal(version);
         return section.updateSkyLightInternal(lightData);
     }
 
     LightUpdateResult<byte[]> relightSkyLightExternal() {
-        var version = section.getNextSkyLightExternalVersion();
+        int version = section.getNextSkyLightExternalVersion();
         var externalLight = ParallelLightSection.computeExternal(section, ParallelLightSection::getSkyLight, s -> s.getSkyLightInternal().data());
         var newData = new ParallelLightSection.LightData<>(externalLight, version);
         return section.updateSkyLightExternal(newData);
@@ -38,8 +38,8 @@ public class SkyLightSection {
         } finally {
             section.chunkData.chunk.unlockReadLock();
         }
-        var maxY = section.chunkData.chunk.getInstance().getCachedDimensionType().maxY();
-        var sectionY = section.sectionY();
+        int maxY = section.chunkData.chunk.getInstance().getCachedDimensionType().maxY();
+        int sectionY = section.sectionY();
         var queue = getSkyLightInternalSources(heightmap, maxY, sectionY);
         var content = queue == null ? LightCompute.CONTENT_FULLY_LIT : LightCompute.compute(blockPalette, queue);
         return new ParallelLightSection.LightData<>(content, version);
@@ -48,8 +48,8 @@ public class SkyLightSection {
     private static @Nullable ShortArrayFIFOQueue getSkyLightInternalSources(int[] heightmap, int maxY, int sectionY) {
         final int sectionMaxY = (sectionY + 1) * 16 - 1;
         final int sectionMinY = sectionY * 16;
-        var fullyLit = true;
-        for (var i = 0; i < 16 * 16; i++) {
+        boolean fullyLit = true;
+        for (int i = 0; i < 16 * 16; i++) {
             final int height = heightmap[i];
             if (height > sectionMinY) {
                 fullyLit = false;
@@ -62,8 +62,8 @@ public class SkyLightSection {
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
                 final int height = heightmap[z << 4 | x];
-                var topmostY = Math.min(sectionMaxY, maxY);
-                var endY = Math.max(height, sectionMinY);
+                int topmostY = Math.min(sectionMaxY, maxY);
+                int endY = Math.max(height, sectionMinY);
                 for (int y = topmostY; y >= endY; y--) {
                     final int index = x | (z << 4) | ((y % 16) << 8);
                     lightSources.enqueue((short) (index | (15 << 12)));

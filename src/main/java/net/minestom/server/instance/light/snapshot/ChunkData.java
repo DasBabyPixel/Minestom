@@ -22,7 +22,7 @@ public class ChunkData {
         if (data != null) return data;
         chunk.lockReadLock();
         try {
-            var highestBlock = chunk.getHighestBlock();
+            int highestBlock = chunk.getHighestBlock();
             var occlusionMap = chunk.getOcclusionMap();
             data = new OcclusionData(highestBlock, occlusionMap);
             var old = occlusionData.compareAndExchange(null, data);

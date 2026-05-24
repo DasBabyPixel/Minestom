@@ -4,6 +4,7 @@ import net.kyori.adventure.nbt.CompoundBinaryTag;
 import net.minestom.server.instance.block.Block;
 import net.minestom.testing.Env;
 import net.minestom.testing.EnvTest;
+import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -14,14 +15,13 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
+@SuppressWarnings("deprecation")
 @EnvTest
 public class GeneratorIntegrationTest {
 
@@ -164,12 +164,12 @@ public class GeneratorIntegrationTest {
         });
         ChunkLoader chunkLoader = new ChunkLoader() {
             @Override
-            public Chunk loadChunk(Instance instance, int chunkX, int chunkZ) {
+            public Chunk loadChunk(@NonNull Instance instance, int chunkX, int chunkZ) {
                 throw exception;
             }
 
             @Override
-            public void saveChunk(Chunk chunk) {
+            public void saveChunk(@NonNull Chunk chunk) {
             }
 
             @Override

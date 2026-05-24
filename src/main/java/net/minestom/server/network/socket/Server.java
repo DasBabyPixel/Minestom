@@ -145,7 +145,7 @@ public final class Server {
                 } catch (ClosedChannelException | EOFException _) {
                     connection.disconnect();
                 } catch (Throwable e) {
-                    boolean isExpected = e instanceof IOException && "Broken pipe".equals(e.getMessage()) || "An established connection was aborted by the software in your host machine".equals(e.getMessage());
+                    boolean isExpected = (e instanceof IOException && "Broken pipe".equals(e.getMessage())) || "An established connection was aborted by the software in your host machine".equals(e.getMessage());
                     if (!isExpected) MinecraftServer.getExceptionManager().handleException(e);
                     connection.disconnect();
                 }

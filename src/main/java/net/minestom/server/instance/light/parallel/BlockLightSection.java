@@ -20,7 +20,7 @@ public final class BlockLightSection {
     }
 
     LightUpdateResult<byte[]> relightBlockLightExternal() {
-        var version = section.getNextBlockLightExternalVersion();
+        int version = section.getNextBlockLightExternalVersion();
         var externalLight = computeExternal(section, ParallelLightSection::getBlockLight, s -> s.getBlockLightInternal().data());
         var newData = new LightData<>(externalLight, version);
         return section.updateBlockLightExternal(newData);
@@ -39,7 +39,7 @@ public final class BlockLightSection {
     }
 
     LightUpdateResult<byte[]> relightBlockLightInternal() {
-        var version = section.getNextBlockLightInternalVersion();
+        int version = section.getNextBlockLightInternalVersion();
         var lightData = prepareBlockLightInternal(version);
         return section.updateBlockLightInternal(lightData);
     }
@@ -59,7 +59,7 @@ public final class BlockLightSection {
         if (singleValue != -1) {
             Block block = Block.fromStateId(singleValue);
             assert block != null;
-            int lightEmission = block.registry().lightEmission();
+            int lightEmission = block.lightEmission();
             if (lightEmission <= 0) return new ShortArrayFIFOQueue(0);
             ShortArrayFIFOQueue lightSources = new ShortArrayFIFOQueue(SECTION_BLOCK_COUNT);
             final int prefix = lightEmission << 12;
@@ -73,7 +73,7 @@ public final class BlockLightSection {
             blockPalette.getAllPresent((x, y, z, stateId) -> {
                 final Block block = Block.fromStateId(stateId);
                 assert block != null;
-                final int lightEmission = block.registry().lightEmission();
+                final int lightEmission = block.lightEmission();
                 if (lightEmission <= 0) return;
                 final int index = x | (z << 4) | (y << 8);
                 lightSources.enqueue((short) (index | (lightEmission << 12)));

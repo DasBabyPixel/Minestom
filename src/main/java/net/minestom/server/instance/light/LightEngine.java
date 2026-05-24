@@ -35,6 +35,7 @@ public interface LightEngine {
         boolean hasWork();
 
         final class Hash<WorkKey> implements WorkTypeTracker<WorkKey> {
+            @SuppressWarnings("StaticAssignmentOfThrowable")
             private static final Exception CANCELLED = new Exception("Cancelled");
             private final AtomicInteger pollers = new AtomicInteger();
             private final ConcurrentHashMap<WorkKey, WorkEntry> work = new ConcurrentHashMap<>();

@@ -45,8 +45,8 @@ public class CalculationContext {
     }
 
     private static ChunkContext create(LightingChunk chunk, @Nullable Neighbors neighbor, int sectionY) {
-        var minSection = chunk.getMinSection();
-        var maxSection = chunk.getMaxSection();
+        int minSection = chunk.getMinSection();
+        int maxSection = chunk.getMaxSection();
         var lowerSection = sectionY == minSection - 1 ? null : (SnapshotLightSection) chunk.getLightSection(sectionY - 1);
         var middleSection = (SnapshotLightSection) chunk.getLightSection(sectionY);
         var upperSection = sectionY == maxSection ? null : (SnapshotLightSection) chunk.getLightSection(sectionY + 1);

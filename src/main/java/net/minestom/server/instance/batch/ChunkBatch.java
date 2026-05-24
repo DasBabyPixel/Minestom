@@ -111,7 +111,7 @@ public class ChunkBatch implements Batch<ChunkCallback> {
      * @return The inverse of this batch, if inverse is enabled in the {@link BatchOption}
      */
     public @UnknownNullability ChunkBatch apply(Instance instance, int chunkX, int chunkZ, @Nullable ChunkCallback callback) {
-        final Chunk chunk = instance.getChunk(chunkX, chunkZ);
+        @SuppressWarnings("deprecation") final Chunk chunk = instance.getChunk(chunkX, chunkZ);
         if (chunk == null) {
             LOGGER.warn("Unable to apply ChunkBatch to unloaded chunk ({}, {}) in {}.",
                     chunkX, chunkZ, instance.getUuid());

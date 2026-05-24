@@ -6,9 +6,13 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
+import java.util.Objects;
 import java.util.Random;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class IntervalTreeTest {
     private static IntervalTree<Integer> degenerateTree;
@@ -25,7 +29,7 @@ public class IntervalTreeTest {
     @BeforeAll
     static void setupDegenerateTree() {
         degenerateTree = new IntervalTree<>();
-        for (var i = 0; i < 10000; i++) {
+        for (int i = 0; i < 10000; i++) {
             int finalI = i;
             var val = degenerateTree.insertOrGet(i, i + 50, () -> finalI);
             assertEquals(i, val);
@@ -38,10 +42,10 @@ public class IntervalTreeTest {
         largeTree = new IntervalTree<>();
         largeTreeValidEntries = new ArrayList<>();
         var random = new Random(105976);
-        var len = 100_000;
-        for (var i = 0; i < len; i++) {
-            var num = random.nextInt(len * 2);
-            var state = largeTree.state();
+        int len = 100_000;
+        for (int i = 0; i < len; i++) {
+            int num = random.nextInt(len * 2);
+            int state = largeTree.state();
             largeTree.insertOrGet(num, num + 50, () -> num);
             if (largeTree.modifiedSince(state)) {
                 if (largeTreeValidEntries.size() < 1000) largeTreeValidEntries.add(new Range.Int(num, num + 50));
@@ -151,9 +155,9 @@ public class IntervalTreeTest {
     @Test
     void validateLargeTreeCorrectRemoval() {
         var copy = largeTree.copy();
-        var prevSize = largeTree.size();
+        int prevSize = largeTree.size();
         for (var start : largeTreeValidEntries) {
-            assertTrue(copy.delete(start.min(), start.max()));
+            assertTrue(copy.delete(Objects.requireNonNull(start.min()), Objects.requireNonNull(start.max())));
         }
         assertEquals(prevSize - largeTreeValidEntries.size(), copy.size());
     }
@@ -161,7 +165,7 @@ public class IntervalTreeTest {
     @Test
     void validateGetLargeTree() {
         for (var range : largeTreeValidEntries) {
-            var num = largeTree.get(range.min(), range.max());
+            var num = largeTree.get(Objects.requireNonNull(range.min()), Objects.requireNonNull(range.max()));
             assertEquals(range.min(), num);
         }
     }
@@ -205,13 +209,13 @@ public class IntervalTreeTest {
 
     @Test
     void testSelection() {
-        for (var i = 80; i < 9950; i += 37) {
+        for (int i = 80; i < 9950; i += 37) {
             var result = degenerateTree.searchNodes(i);
             assertEquals(51, result.size());
             for (var node : result) {
-                assertEquals(50, node.end.lastKey() - node.start);
+                assertEquals(50, node.end.lastIntKey() - node.start);
                 assertTrue(node.start <= i);
-                assertTrue(node.end.lastKey() >= i);
+                assertTrue(node.end.lastIntKey() >= i);
             }
         }
     }
@@ -230,9 +234,9 @@ public class IntervalTreeTest {
     }
 
     private static void validateHeight(IntervalTree<?> tree) {
-        var height = tree.height();
-        var size = tree.size();
-        var expectedMaxHeight = 2 * Math.log(size + 1) / Math.log(2);
+        int height = tree.height();
+        int size = tree.size();
+        double expectedMaxHeight = 2 * Math.log(size + 1) / Math.log(2);
         assertTrue(height <= expectedMaxHeight, "Height " + height + " must be less than or equal to expected max height " + (int) Math.ceil(expectedMaxHeight));
     }
 
@@ -242,9 +246,9 @@ public class IntervalTreeTest {
 
     private static int validateMaxEnd(Node<?> node) {
         if (node == null) return Integer.MIN_VALUE;
-        var left = validateMaxEnd(node.left);
-        var right = validateMaxEnd(node.right);
-        var maxEnd = Math.max(node.end.lastKey(), Math.max(left, right));
+        int left = validateMaxEnd(node.left);
+        int right = validateMaxEnd(node.right);
+        int maxEnd = Math.max(node.end.lastIntKey(), Math.max(left, right));
         assertEquals(node.maxEnd, maxEnd, "Node maxEnd incorrect");
         return maxEnd;
     }

@@ -111,8 +111,8 @@ public class InstanceBlockIntegrationTest {
     @Test
     void testLoadManyChunks(Env env) {
         var instance = env.createFlatInstance();
-        for (var x = 0; x < 100; x++) {
-            for (var z = 0; z < 100; z++) {
+        for (int x = 0; x < 100; x++) {
+            for (int z = 0; z < 100; z++) {
                 instance.loadChunk(x,z).join();
             }
         }

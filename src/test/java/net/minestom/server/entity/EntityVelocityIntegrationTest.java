@@ -1,6 +1,5 @@
 package net.minestom.server.entity;
 
-import net.minestom.server.coordinate.CoordConversion;
 import net.minestom.server.coordinate.Pos;
 import net.minestom.server.coordinate.Vec;
 import net.minestom.server.instance.Instance;
@@ -8,7 +7,6 @@ import net.minestom.server.instance.WorldBorder;
 import net.minestom.server.instance.block.Block;
 import net.minestom.server.instance.chunksystem.ChunkClaim;
 import net.minestom.server.network.packet.server.play.EntityVelocityPacket;
-import net.minestom.server.utils.chunk.ChunkUtils;
 import net.minestom.testing.Env;
 import net.minestom.testing.EnvTest;
 import org.junit.jupiter.api.Test;

@@ -1,7 +1,5 @@
 package net.minestom.server.instance;
 
-import it.unimi.dsi.fastutil.longs.LongArrayList;
-import it.unimi.dsi.fastutil.longs.LongList;
 import net.kyori.adventure.key.Key;
 import net.kyori.adventure.nbt.CompoundBinaryTag;
 import net.minestom.server.MinecraftServer;
@@ -23,8 +21,6 @@ import net.minestom.server.instance.chunksystem.ChunkManager;
 import net.minestom.server.instance.generator.Generator;
 import net.minestom.server.network.packet.server.play.BlockChangePacket;
 import net.minestom.server.network.packet.server.play.BlockEntityDataPacket;
-import net.minestom.server.network.packet.server.play.MultiBlockChangePacket;
-import net.minestom.server.network.packet.server.play.UnloadChunkPacket;
 import net.minestom.server.network.packet.server.play.WorldEventPacket;
 import net.minestom.server.registry.Registries;
 import net.minestom.server.registry.RegistryKey;
@@ -37,13 +33,10 @@ import net.minestom.server.utils.validate.Check;
 import net.minestom.server.world.DimensionType;
 import net.minestom.server.worldevent.WorldEvent;
 import org.jetbrains.annotations.Nullable;
-import org.jetbrains.annotations.UnknownNullability;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import space.vectrix.flare.fastutil.Long2ObjectSyncMap;
 
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -53,9 +46,6 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
-import java.util.function.Supplier;
 
 import static net.minestom.server.utils.chunk.ChunkUtils.isLoaded;
 
@@ -277,14 +267,17 @@ public class InstanceContainer extends Instance {
     }
 
     private CompletableFuture<Chunk> retrieveChunk(int chunkX, int chunkZ) {
-        var index = CoordConversion.chunkIndex(chunkX, chunkZ);
+        long index = CoordConversion.chunkIndex(chunkX, chunkZ);
         var claim = chunks.get(index);
         //noinspection ConstantValue - intellij is wrong here
         if (claim == null) {
             var newClaim = chunkManager.addClaim(chunkX, chunkZ);
             claim = chunks.putIfAbsent(index, newClaim);
             if (claim != null) {
-                chunkManager.removeClaim(newClaim.claim());
+                chunkManager.removeClaim(newClaim.claim()).exceptionally(t -> {
+                    MinecraftServer.getExceptionManager().handleException(t);
+                    return null;
+                });
             } else claim = newClaim;
         }
         return claim.chunkFuture();
@@ -302,10 +295,14 @@ public class InstanceContainer extends Instance {
         var claim = chunks.remove(CoordConversion.chunkIndex(chunkX, chunkZ));
         //noinspection ConstantValue - intellij is wrong here
         if (claim == null) return;
-        this.chunkManager.removeClaim(claim.claim());
+        this.chunkManager.removeClaim(claim.claim()).exceptionally(t -> {
+            MinecraftServer.getExceptionManager().handleException(t);
+            return null;
+        });
     }
 
     @Override
+    @Deprecated
     public @Nullable Chunk getChunk(int chunkX, int chunkZ) {
         return this.chunkManager.getLoadedChunk(chunkX, chunkZ);
     }
@@ -426,7 +423,7 @@ public class InstanceContainer extends Instance {
         // Make sure chunks can be unloaded with #unloadChunk
         for (var chunkAndClaim : pair.second()) {
             var chunk = chunkAndClaim.chunkFuture().resultNow();
-            var index = CoordConversion.chunkIndex(chunk.getChunkX(), chunk.getChunkZ());
+            long index = CoordConversion.chunkIndex(chunk.getChunkX(), chunk.getChunkZ());
             copiedInstance.chunks.put(index, chunkAndClaim);
         }
 
@@ -563,14 +560,5 @@ public class InstanceContainer extends Instance {
                         null, null, true, updateDistance + 1);
             }
         }
-    }
-
-    private CompletableFuture<Chunk> loadOrRetrieve(int chunkX, int chunkZ, Supplier<CompletableFuture<Chunk>> supplier) {
-        final Chunk chunk = getChunk(chunkX, chunkZ);
-        if (chunk != null) {
-            // Chunk already loaded
-            return CompletableFuture.completedFuture(chunk);
-        }
-        return supplier.get();
     }
 }

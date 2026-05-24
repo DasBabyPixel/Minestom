@@ -21,10 +21,24 @@ import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
-import javax.swing.*;
+import javax.swing.ImageIcon;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.OverlayLayout;
+import javax.swing.ScrollPaneConstants;
+import javax.swing.SwingUtilities;
 import javax.swing.event.MouseInputAdapter;
-import java.awt.*;
-import java.awt.event.*;
+import java.awt.BorderLayout;
+import java.awt.Button;
+import java.awt.Color;
+import java.awt.GridLayout;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
+import java.awt.event.MouseEvent;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.awt.image.BufferedImage;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -38,6 +52,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.ReentrantLock;
 
+@SuppressWarnings({"rawtypes", "unused"})
 @EnvTest
 public class ChunkManagerGUITest {
     private static final int IMG_WIDTH = 400, IMG_HEIGHT = 400;
@@ -65,7 +80,7 @@ public class ChunkManagerGUITest {
     volatile boolean submitted = false;
     volatile boolean submittedAgain = false;
 
-    class Overlay {
+    static class Overlay {
         String name;
         BufferedImage image;
         ImageIcon icon;
@@ -79,7 +94,7 @@ public class ChunkManagerGUITest {
             icon = new ImageIcon();
             label = new JLabel(icon);
             button = new Button("Toggle" + name);
-            button.addActionListener(e -> setVisible(!label.isVisible()));
+            button.addActionListener(_ -> setVisible(!label.isVisible()));
             setVisible(true);
         }
 
@@ -101,8 +116,8 @@ public class ChunkManagerGUITest {
         }
 
         void fill(int color) {
-            for (var y = 0; y < image.getHeight(); y++) {
-                for (var x = 0; x < image.getWidth(); x++) {
+            for (int y = 0; y < image.getHeight(); y++) {
+                for (int x = 0; x < image.getWidth(); x++) {
                     image.setRGB(x, y, color);
                 }
             }
@@ -114,11 +129,11 @@ public class ChunkManagerGUITest {
     @Test
     void visualizeDrop() {
         var drop = new PriorityDrop.Square();
-        var offsetX = 90;
-        var offsetZ = 120;
+        int offsetX = 90;
+        int offsetZ = 120;
         var a = new double[61][61];
-        for (var z = 0; z < 31; z++) {
-            for (var x = 0; x < 31; x++) {
+        for (int z = 0; z < 31; z++) {
+            for (int x = 0; x < 31; x++) {
                 a[30 + z][30 + x] = drop.calculate(offsetX, offsetZ, offsetX + x, offsetZ + z);
                 if (x != 0) {
                     a[30 + z][30 - x] = drop.calculate(offsetX, offsetZ, offsetX - x, offsetZ + z);
@@ -132,7 +147,7 @@ public class ChunkManagerGUITest {
             }
         }
         for (var doubles : a) {
-            for (var i = 0; i < doubles.length; i++) {
+            for (int i = 0; i < doubles.length; i++) {
                 doubles[i] += 10;
             }
         }
@@ -169,7 +184,7 @@ public class ChunkManagerGUITest {
                     LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(1));
             }
         });
-        instance.setGenerator(unit -> {
+        instance.setGenerator(_ -> {
             LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(1));
         });
 
@@ -203,7 +218,7 @@ public class ChunkManagerGUITest {
         var panel = new JPanel(new BorderLayout());
         var desc = new JPanel(new GridLayout(5, 1));
 
-        for (var i = 0; i < UpdateType.values().length; i++) {
+        for (int i = 0; i < UpdateType.values().length; i++) {
             sizeLabels[i] = new JLabel();
             updateSize(i);
             desc.add(sizeLabels[i]);
@@ -256,7 +271,7 @@ public class ChunkManagerGUITest {
     private void start1() {
         Thread.startVirtualThread(() -> {
             var futures = new CompletableFuture[100];
-            for (var i = 0; i < 100; i++) {
+            for (int i = 0; i < 100; i++) {
                 futures[i] = manager.addClaim(150, i, 0, 10, ChunkClaim.Shape.SQUARE).chunkFuture();
             }
             CompletableFuture.allOf(futures).join();
@@ -296,7 +311,7 @@ public class ChunkManagerGUITest {
                 }
                 updateLoadedChunks();
                 updateSavingChunks();
-                for (var i = 0; i < updateTypes.length; i++) {
+                for (int i = 0; i < updateTypes.length; i++) {
                     updateSize(i);
                 }
                 if (submittedAgain) {
@@ -324,8 +339,8 @@ public class ChunkManagerGUITest {
     Long2ObjectMap<Chunk> saving = new Long2ObjectOpenHashMap<>();
 
     void colorizeSave(Chunk chunk, boolean start, int color) {
-        var x = chunk.getChunkX();
-        var z = chunk.getChunkZ();
+        int x = chunk.getChunkX();
+        int z = chunk.getChunkZ();
         if (x < 0 || z < 0 || x >= IMG_WIDTH || z >= IMG_HEIGHT) return;
         offer(() -> {
             if (start) {
@@ -422,8 +437,8 @@ public class ChunkManagerGUITest {
 
     void addMouse() {
         var keyPressed = new IntOpenHashSet();
-        var factX = DISPLAY_WIDTH / IMG_WIDTH;
-        var factZ = DISPLAY_HEIGHT / IMG_HEIGHT;
+        int factX = DISPLAY_WIDTH / IMG_WIDTH;
+        int factZ = DISPLAY_HEIGHT / IMG_HEIGHT;
         var mainImage = mainOverlay.image;
         var mainImageLabel = mainOverlay.label;
         var l = new MouseInputAdapter() {
@@ -527,14 +542,14 @@ public class ChunkManagerGUITest {
                     } else {
                         var it = loadedChunks.get(btn).longIterator();
                         while (it.hasNext()) {
-                            var loadedChunk = it.nextLong();
-                            var x = CoordConversion.chunkIndexGetX(loadedChunk);
-                            var z = CoordConversion.chunkIndexGetZ(loadedChunk);
+                            long loadedChunk = it.nextLong();
+                            int x = CoordConversion.chunkIndexGetX(loadedChunk);
+                            int z = CoordConversion.chunkIndexGetZ(loadedChunk);
                             if (newClaim.contains(x, z)) continue;
                             it.remove();
                         }
                     }
-                    instance.getChunkManager().removeClaim(claim);
+                    var _ = instance.getChunkManager().removeClaim(claim);
                 } finally {
                     lock.unlock();
                 }

@@ -7,6 +7,7 @@ import org.jetbrains.annotations.UnknownNullability;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.function.Consumer;
@@ -20,9 +21,8 @@ import java.util.stream.Collectors;
  * can be taken on from
  * <a href="https://en.wikipedia.org/w/index.php?title=Interval_tree&oldid=1233051410">Wikipedia</a>
  *
- * @param <T>
+ * @param <T> the type of stored data in the tree
  */
-@SuppressWarnings("unused")
 public class IntervalTree<T> {
 
     static final boolean RED = false;
@@ -94,7 +94,7 @@ public class IntervalTree<T> {
         return nodes == null ? List.of() : nodes.collect();
     }
 
-    public void searchNodes(ReusableList<Node<T>> targetList, int point) {
+    void searchNodes(ReusableList<Node<T>> targetList, int point) {
         this.search(this.root, point, targetList);
     }
 
@@ -449,10 +449,16 @@ public class IntervalTree<T> {
         return this.size;
     }
 
+    @Override
     public boolean equals(Object other) {
         if (!(other instanceof IntervalTree<?> tree)) return false;
         if (this.size != tree.size) return false;
         return equals(this.root, tree.root);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(this.root);
     }
 
     private static boolean equals(@Nullable Node<?> node, @Nullable Node<?> o) {
@@ -571,6 +577,11 @@ public class IntervalTree<T> {
             return this.equalsDown(other) && this.equalsUp(other);
         }
 
+        @Override
+        public int hashCode() {
+            return Objects.hash(start, color, maxEnd, parent, left, right, end);
+        }
+
         private boolean equalsUp(@Nullable Node<?> other) {
             if (other == null) return false;
             if (this.hasDifferingValues(other)) return false;
@@ -599,7 +610,7 @@ public class IntervalTree<T> {
         }
 
         public int calculateMaxEnd() {
-            var val = this.end.lastIntKey();
+            int val = this.end.lastIntKey();
             if (this.left != null) {
                 val = Math.max(val, this.left.maxEnd);
             }
@@ -617,10 +628,6 @@ public class IntervalTree<T> {
         static String toStringRecursive(@Nullable Node<?> node) {
             if (node == null) return "[nil]";
             return node.end.int2ObjectEntrySet().stream().map(e -> "[[%d,%d]=%s,left=%s,right=%s]".formatted(node.start, e.getIntKey(), e.getValue(), toStringRecursive(node.left), toStringRecursive(node.right))).collect(Collectors.joining(", "));
-        }
-
-        public String toStringRecursive() {
-            return toStringRecursive(this);
         }
 
         @Override

@@ -1,6 +1,10 @@
 package net.minestom.server.entity;
 
-import it.unimi.dsi.fastutil.longs.*;
+import it.unimi.dsi.fastutil.longs.Long2ObjectRBTreeMap;
+import it.unimi.dsi.fastutil.longs.Long2ObjectSortedMap;
+import it.unimi.dsi.fastutil.longs.LongComparator;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import it.unimi.dsi.fastutil.longs.LongSet;
 import net.minestom.server.ServerFlag;
 import net.minestom.server.coordinate.CoordConversion;
 import net.minestom.server.coordinate.Vec;
@@ -12,8 +16,6 @@ import net.minestom.server.network.packet.server.play.ChunkBatchFinishedPacket;
 import net.minestom.server.network.packet.server.play.ChunkBatchStartPacket;
 import net.minestom.server.utils.MathUtils;
 import org.jetbrains.annotations.ApiStatus;
-import org.jetbrains.annotations.Nullable;
-import org.jetbrains.annotations.UnknownNullability;
 import org.jetbrains.annotations.VisibleForTesting;
 
 import java.util.concurrent.locks.ReentrantLock;
@@ -25,7 +27,7 @@ public class PlayerChunkQueue {
     // When we have to re-sort everything, because the player moved, this queue will be replaced
     // entirely. The other option is to remove all elements, change the comparator,
     // then add all elements again, which is arguably worse.
-    private Long2ObjectSortedMap<Chunk> chunkQueue = new Long2ObjectRBTreeMap<>(this.compareChunkDistance(0, 0));
+    private Long2ObjectSortedMap<Chunk> chunkQueue = new Long2ObjectRBTreeMap<>(PlayerChunkQueue.compareChunkDistance(0, 0));
     private final LongSet visibleChunks = new LongOpenHashSet();
     private boolean needsChunkPositionSync;
     private float targetChunksPerTick;
@@ -36,6 +38,7 @@ public class PlayerChunkQueue {
     private int posChunkX;
     private int posChunkZ;
 
+    @SuppressWarnings("this-escape")
     public PlayerChunkQueue(Player player) {
         this.player = player;
         this.resetState();
@@ -93,10 +96,11 @@ public class PlayerChunkQueue {
         lock.lock();
         try {
             //noinspection ConstantValue - intellij is wrong here
-            var cancelled = chunkQueue.remove(CoordConversion.chunkIndex(chunkX, chunkZ)) != null;
+            boolean cancelled = chunkQueue.remove(CoordConversion.chunkIndex(chunkX, chunkZ)) != null;
             if (visibleChunks.remove(CoordConversion.chunkIndex(chunkX, chunkZ))) {
                 EventDispatcher.call(new PlayerChunkUnloadEvent(player, chunkX, chunkZ));
             }
+            //noinspection ConstantValue - intellij is wrong here
             return cancelled;
         } finally {
             lock.unlock();
@@ -121,11 +125,10 @@ public class PlayerChunkQueue {
         }
 
         lock.lock();
-
-        // The position of the player may have changed, and if it has, we have to resort everything in the queue
-        this.resortChangedPosition();
-
         try {
+            // The position of the player may have changed, and if it has, we have to resort everything in the queue
+            this.resortChangedPosition();
+
             // Queue is empty, do nothing
             if (chunkQueue.isEmpty()) {
                 // Reset to prevent lag spikes when new chunks are in queue and all would be sent at the same time
@@ -172,15 +175,15 @@ public class PlayerChunkQueue {
 
     private void resortChangedPosition() {
         var currentPos = player.getPosition();
-        var chunkX = currentPos.chunkX();
-        var chunkZ = currentPos.chunkZ();
+        int chunkX = currentPos.chunkX();
+        int chunkZ = currentPos.chunkZ();
         if (posChunkX == chunkX && posChunkZ == chunkZ) return; // Nothing changed, player didn't change chunk
 
         posChunkX = chunkX;
         posChunkZ = chunkZ;
         // Re-add everything to a new queue with a different comparator
         // This should free the old queue to be garbage collected
-        var newQueue = new Long2ObjectRBTreeMap<@Nullable Chunk>(compareChunkDistance(chunkX, chunkZ));
+        var newQueue = new Long2ObjectRBTreeMap<Chunk>(compareChunkDistance(chunkX, chunkZ));
         // This is quite expensive. I would like a better way to do this.
         newQueue.putAll(chunkQueue);
         // This assert-statement helps with invalid comparators
@@ -188,19 +191,19 @@ public class PlayerChunkQueue {
         chunkQueue = newQueue;
     }
 
-    private LongComparator compareChunkDistance(int x, int z) {
+    private static LongComparator compareChunkDistance(int x, int z) {
         return (long chunkIndexA, long chunkIndexB) -> {
             int chunkAX = CoordConversion.chunkIndexGetX(chunkIndexA);
             int chunkAZ = CoordConversion.chunkIndexGetZ(chunkIndexA);
             int chunkBX = CoordConversion.chunkIndexGetX(chunkIndexB);
             int chunkBZ = CoordConversion.chunkIndexGetZ(chunkIndexB);
             int diffAX = chunkAX - x;
-            var diffAZ = chunkAZ - z;
+            int diffAZ = chunkAZ - z;
             int diffBX = chunkBX - x;
-            var diffBZ = chunkBZ - z;
+            int diffBZ = chunkBZ - z;
             int chunkDistanceA = diffAX * diffAX + diffAZ * diffAZ;
             int chunkDistanceB = diffBX * diffBX + diffBZ * diffBZ;
-            var cmp = Integer.compare(chunkDistanceA, chunkDistanceB);
+            int cmp = Integer.compare(chunkDistanceA, chunkDistanceB);
             if (cmp != 0) return cmp;
             // We need extra logic, otherwise different chunk keys evaluate to be equal
             // At this point the chunks should be ordered some arbitrary way, doesn't really matter which way
