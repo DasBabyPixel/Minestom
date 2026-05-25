@@ -106,6 +106,7 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
@@ -791,6 +792,19 @@ public class Player extends LivingEntity implements CommandSender, HoverEventSou
                 if (chunk == null || !chunk.isLoaded()) continue;
 
                 sendPacket(chunk.getFullDataPacket());
+                if (true) {
+                    // Usually, if a chunk is loaded on the client, block changes should also update the client-side light.
+                    // No UpdateLightPacket should be required. We are using DynamicChunk, so no server-side lighting logic should
+                    // interfere.
+                    sendPacket(new BlockChangePacket(chunk.toPosition().add(8, 40, 8), Block.GLOWSTONE));
+                } else {
+                    // Sending the update after a 5-second delay will (usually) work, as long as the client FPS don't drop below 1/5
+                    Thread.startVirtualThread(() -> {
+                        LockSupport.parkNanos(java.util.concurrent.TimeUnit.SECONDS.toNanos(5));
+                        sendPacket(new BlockChangePacket(chunk.toPosition().add(8, 40, 8), Block.GLOWSTONE));
+                    });
+                }
+
                 EventDispatcher.call(new PlayerChunkLoadEvent(this, chunkX, chunkZ));
 
                 pendingChunkCount -= 1f;
