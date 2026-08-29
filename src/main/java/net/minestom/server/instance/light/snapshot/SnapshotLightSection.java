@@ -3,7 +3,7 @@ package net.minestom.server.instance.light.snapshot;
 import net.minestom.server.instance.Section;
 import net.minestom.server.instance.light.LightCompute;
 import net.minestom.server.instance.light.LightSection;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -25,7 +25,7 @@ public class SnapshotLightSection implements LightSection<SnapshotLightSection, 
         this.section = section;
         this.sectionY = sectionY;
         this.blockLight = new BlockLight(this);
-        this.skyLight = new SkyLight();
+        this.skyLight = new SkyLight(this, chunkData);
     }
 
     public ChunkData chunkData() {
@@ -36,6 +36,11 @@ public class SnapshotLightSection implements LightSection<SnapshotLightSection, 
         updateSnapshotSync();
         var context = createContext();
         blockLight.relightSync(context);
+        skyLight.relightSync(context);
+    }
+
+    public int sectionY() {
+        return sectionY;
     }
 
     public SectionSnapshot snapshot() {
@@ -105,6 +110,7 @@ public class SnapshotLightSection implements LightSection<SnapshotLightSection, 
     public void neighborLoadUnloadDetected() {
         var context = createContext();
         blockLight.relightSync(context);
+        skyLight.relightSyncExternal(context);
     }
 
     private CalculationContext createContext() {
@@ -113,6 +119,11 @@ public class SnapshotLightSection implements LightSection<SnapshotLightSection, 
 
     void scheduleResendBlock() {
         blockDirty.set(true);
+        chunkData.chunk.scheduleSpecificResend();
+    }
+
+    void scheduleResendSky() {
+        skyDirty.set(true);
         chunkData.chunk.scheduleSpecificResend();
     }
 

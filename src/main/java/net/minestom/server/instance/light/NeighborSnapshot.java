@@ -1,6 +1,6 @@
 package net.minestom.server.instance.light;
 
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Map;
 

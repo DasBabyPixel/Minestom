@@ -11,10 +11,13 @@ import net.minestom.server.instance.block.Block;
 import net.minestom.server.instance.block.BlockFace;
 import net.minestom.server.instance.block.BlockHandler;
 import net.minestom.server.instance.heightmap.Heightmap;
-import net.minestom.server.instance.light.snapshot.SnapshotLightSectionType;
+import net.minestom.server.instance.light.parallel.ParallelLightSection;
+import net.minestom.server.instance.palette.Palette;
 import net.minestom.server.network.packet.server.CachedPacket;
 import net.minestom.server.network.packet.server.play.UpdateLightPacket;
 import net.minestom.server.network.packet.server.play.data.LightData;
+import net.minestom.server.utils.collection.ConcurrentMessageQueues;
+import net.minestom.server.world.DimensionType;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nullable;
 
@@ -131,7 +134,7 @@ public class LightingChunk extends DynamicChunk {
 
     @SuppressWarnings("this-escape")
     public LightingChunk(Instance instance, int chunkX, int chunkZ) {
-        this(instance, chunkX, chunkZ, c -> new Typed<>(c, SnapshotLightSectionType.TYPE));
+        this(instance, chunkX, chunkZ, c -> new Typed<>(c, ParallelLightSection.Type.TYPE));
     }
 
     @SuppressWarnings("this-escape")
@@ -143,7 +146,7 @@ public class LightingChunk extends DynamicChunk {
     }
 
     public int getHighestBlock() {
-        assert holdsReadLock();
+        getOcclusionMap();
         return highestBlock;
     }
 
@@ -153,7 +156,7 @@ public class LightingChunk extends DynamicChunk {
         if (this.occlusionMap != null) return this.occlusionMap;
 
         int minY = instance.getCachedDimensionType().minY();
-        highestBlock = minY - 1;
+        var highestBlock = minY - 1;
 
         // Only read-locked. We could race with other callers of getOcclusionMap,
         // but that's not an issue since we are just updating a field. The field doesn't even need to be volatile
@@ -173,8 +176,44 @@ public class LightingChunk extends DynamicChunk {
             }
         }
 
+        this.highestBlock = highestBlock;
         this.occlusionMap = occlusionMap;
         return occlusionMap;
+    }
+
+//    private static int getHighestBlockSection(DimensionType dimensionType, List<Section> sections) {
+//        int y = dimensionType.maxY();
+//        for (var section : sections) {
+//            final Palette blockPalette = section.blockPalette();
+//            if (blockPalette.count() != 0) break;
+//            y -= 16;
+//        }
+//        return y;
+//    }
+//
+//    private static OcclusionData getOcclusionData(DimensionType dimensionType, List<Section> sections) {
+//        var minY = dimensionType.minY();
+//        var highestBlock = minY - 1;
+//        var startY = getHighestBlockSection(dimensionType, sections);
+//
+//        var occlusionMap = new int[CHUNK_SIZE_X * CHUNK_SIZE_Z];
+//
+//        for (int x = 0; x < CHUNK_SIZE_X; x++) {
+//            for (int z = 0; z < CHUNK_SIZE_Z; z++) {
+//                int height = startY;
+//                while (height >= minY) {
+//                    Block block = getBlock(x, height, z, Condition.TYPE);
+//                    if (block != Block.AIR) highestBlock = Math.max(highestBlock, height);
+//                    if (checkSkyOcclusion(block)) break;
+//                    height--;
+//                }
+//                occlusionMap[z << 4 | x] = (height + 1);
+//            }
+//        }
+//        return new OcclusionData(occlusionMap, highestBlock);
+//    }
+
+    private record OcclusionData(int[] occlusionMap, int highestBlock) {
     }
 
     /**
@@ -249,6 +288,10 @@ public class LightingChunk extends DynamicChunk {
         // Neighbor has updated. We now invalidate the external lighting
         // We want to keep work on chunk management thread to a minimum, so we delegate via flag
         neighborUpdated = true;
+    }
+
+    public Object chunkData() {
+        return typed.chunkData;
     }
 
     @Override

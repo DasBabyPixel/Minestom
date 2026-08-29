@@ -399,18 +399,24 @@ public class BlockLightMergeIntegrationTest {
     public void skylight(Env env) {
         Instance instance = env.createFlatInstance();
         instance.setChunkSupplier(LightingChunk::new);
-        for (int x = 4; x <= 7; x++) {
-            for (int z = 6; z <= 8; z++) {
-                instance.loadChunk(x, z).join();
-            }
-        }
+//        for (int x = 4; x <= 7; x++) {
+//            for (int z = 6; z <= 8; z++) {
+//                instance.loadChunk(x, z).join();
+//            }
+//        }
+
+        var pos = new BlockVec(94, 41, 128);
+        instance.loadChunk(pos).join();
+        assertEquals(Block.AIR, instance.getBlock(pos));
+        assertEquals(15, lightValSky(instance, pos));
 
         System.out.println("set block");
         instance.setBlock(94, 50, 128, Block.STONE);
+        instance.setBlock(94, 41, 128, Block.AIR);
 
         awaitLight(instance.getChunks());
 
-        byte val = lightValSky(instance, new BlockVec(94, 41, 128));
+        byte val = lightValSky(instance, pos);
         assertEquals(14, val);
     }
 

@@ -57,12 +57,12 @@ public class SkyLightSection {
             }
         }
         if (fullyLit) return null;
+        int topmostY = Math.min(sectionMaxY, maxY);
 
         ShortArrayFIFOQueue lightSources = new ShortArrayFIFOQueue();
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
                 final int height = heightmap[z << 4 | x];
-                int topmostY = Math.min(sectionMaxY, maxY);
                 int endY = Math.max(height, sectionMinY);
                 for (int y = topmostY; y >= endY; y--) {
                     final int index = x | (z << 4) | ((y % 16) << 8);

@@ -1,7 +1,7 @@
 package net.minestom.server.instance.light.snapshot;
 
 import net.minestom.server.instance.light.LightingChunk;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.concurrent.atomic.AtomicReference;
 

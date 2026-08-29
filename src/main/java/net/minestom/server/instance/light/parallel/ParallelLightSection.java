@@ -176,6 +176,10 @@ public class ParallelLightSection implements LightSection<ParallelLightSection, 
 
     @Override
     public int getSkyLight(int x, int y, int z) {
+        System.out.println(sectionX);
+        System.out.println(sectionY);
+        System.out.println(sectionZ);
+        System.out.println(Arrays.toString(skyLight.get().data()));
         return LightCompute.getLight(skyLight.get().data(), x, y, z);
     }
 
@@ -446,6 +450,36 @@ public class ParallelLightSection implements LightSection<ParallelLightSection, 
     }
 
     @ApiStatus.Internal
+    public static void generatorRelightSkyLightExternalAndBakeSync(Collection<? extends LightSection<?, ?, ?>> sections) {
+        var modified = new ArrayList<>(sections.stream().map(s -> (ParallelLightSection) s).toList());
+        for (var section : modified) {
+            // We need to bake once in the beginning to be able to relight external block light
+            section.bakeSkyLight();
+        }
+        // We recalculate the block light until nothing changes.
+        var newModified = new ArrayList<ParallelLightSection>(modified.size());
+        while (!modified.isEmpty()) {
+            for (var section : modified) {
+                var result = section.skyLightSection.relightSkyLightExternal();
+                if (result.asBoolean()) {
+                    // External light changed.
+                    // Does baking make a difference?
+                    if (section.bakeSkyLight().asBoolean()) {
+                        // Light changed, we need to recalculate neighbors
+                        newModified.add(section);
+                    }
+                }
+            }
+
+            // clear the old modified data and swap
+            modified.clear();
+            var tmp = modified;
+            modified = newModified;
+            newModified = tmp;
+        }
+    }
+
+    @ApiStatus.Internal
     public static void generatorRelightBlockLightExternalAndBakeSync(Collection<? extends LightSection<?, ?, ?>> sections) {
         var modified = new ArrayList<>(sections.stream().map(s -> (ParallelLightSection) s).toList());
         for (var section : modified) {
@@ -591,6 +625,7 @@ public class ParallelLightSection implements LightSection<ParallelLightSection, 
                 lightSection.generatorRelightSkyLightInternal();
             }
             generatorRelightBlockLightExternalAndBakeSync(lightSections);
+            generatorRelightSkyLightExternalAndBakeSync(lightSections);
         }
 
         @Override

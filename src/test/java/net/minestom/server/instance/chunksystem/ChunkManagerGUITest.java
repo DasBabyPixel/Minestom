@@ -17,7 +17,6 @@ import net.minestom.testing.Env;
 import net.minestom.testing.EnvTest;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
@@ -408,7 +407,7 @@ public class ChunkManagerGUITest {
             }
 
             @Override
-            public void addUpdate(int x, int z, @NonNull UpdateType updateType) {
+            public void addUpdate(int x, int z, @NotNull UpdateType updateType) {
                 offer(() -> {
                     updateQueueSizes[updateType.ordinal()]++;
                     colorizeUpdate(x, z, 0x4FFF00FF);
@@ -416,7 +415,7 @@ public class ChunkManagerGUITest {
             }
 
             @Override
-            public void removeUpdate(int x, int z, @NonNull UpdateType updateType) {
+            public void removeUpdate(int x, int z, @NotNull UpdateType updateType) {
                 offer(() -> {
                     updateQueueSizes[updateType.ordinal()]--;
                     colorizeUpdate(x, z, 0);
@@ -424,12 +423,12 @@ public class ChunkManagerGUITest {
             }
 
             @Override
-            public void onSaveStarted(@NonNull Chunk chunk) {
+            public void onSaveStarted(@NotNull Chunk chunk) {
                 colorizeSave(chunk, true, 0x4F00FF00);
             }
 
             @Override
-            public void onSaveComplete(@NonNull Chunk chunk) {
+            public void onSaveComplete(@NotNull Chunk chunk) {
                 colorizeSave(chunk, false, 0);
             }
         };

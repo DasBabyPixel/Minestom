@@ -45,6 +45,7 @@ public class CalculationContext {
     }
 
     private static ChunkContext create(LightingChunk chunk, @Nullable Neighbors neighbor, int sectionY) {
+        var chunkData = (ChunkData) chunk.chunkData();
         int minSection = chunk.getMinSection();
         int maxSection = chunk.getMaxSection();
         var lowerSection = sectionY == minSection - 1 ? null : (SnapshotLightSection) chunk.getLightSection(sectionY - 1);
@@ -53,13 +54,11 @@ public class CalculationContext {
         var lower = lowerSection == null ? null : lowerSection.snapshot();
         var middle = middleSection.snapshot();
         var upper = upperSection == null ? null : upperSection.snapshot();
-        return new ChunkContext(chunk, neighbor, lower, middle, upper);
+        return new ChunkContext(chunk, chunkData, neighbor, lower, middle, upper);
     }
 
-    public record ChunkContext(LightingChunk chunk,
-                               @Nullable Neighbors neighbor,
-                               @Nullable SectionSnapshot lower,
-                               SectionSnapshot middle,
+    public record ChunkContext(LightingChunk chunk, ChunkData chunkData, @Nullable Neighbors neighbor,
+                               @Nullable SectionSnapshot lower, SectionSnapshot middle,
                                @Nullable SectionSnapshot upper) {
     }
 }

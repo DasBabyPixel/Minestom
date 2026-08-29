@@ -4,7 +4,7 @@ import net.kyori.adventure.nbt.CompoundBinaryTag;
 import net.minestom.server.instance.block.Block;
 import net.minestom.testing.Env;
 import net.minestom.testing.EnvTest;
-import org.jspecify.annotations.NonNull;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -164,12 +164,12 @@ public class GeneratorIntegrationTest {
         });
         ChunkLoader chunkLoader = new ChunkLoader() {
             @Override
-            public Chunk loadChunk(@NonNull Instance instance, int chunkX, int chunkZ) {
+            public Chunk loadChunk(@NotNull Instance instance, int chunkX, int chunkZ) {
                 throw exception;
             }
 
             @Override
-            public void saveChunk(@NonNull Chunk chunk) {
+            public void saveChunk(@NotNull Chunk chunk) {
             }
 
             @Override
